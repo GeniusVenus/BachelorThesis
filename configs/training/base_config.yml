@@ -9,7 +9,7 @@ data:
   num_classes: &num_classes 5
   batch_size: 16
   color_map:
-    0: [0,0,0]
+    0: [0, 0, 0]
     1: [222, 31, 7]
     2: [200, 200, 200]
     3: [34, 97, 38]
@@ -58,3 +58,6 @@ training:
   epochs: 5
   model_checkpoint: "checkpoints/unet.pth"
 
+# ClearML configuration
+clearml:
+  project_name: "Aerial Semantic Segmentation"

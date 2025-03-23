@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torchmetrics
 from torch.utils.data import DataLoader
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import torch.nn.functional as F
 from tqdm import tqdm
 
@@ -21,11 +21,13 @@ class Trainer:
             metric_meters: Dict[str, AverageMeter],
             train_loader: DataLoader,
             val_loader: DataLoader,
+            task=None,  # ClearML Task object
             device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ):
         self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.model = model
         self.config = config
+        self.task = task  # Store ClearML task
 
         self.model_name = config['model']['name']
         self.model_type = config['model']['type']
@@ -57,6 +59,9 @@ class Trainer:
             text_log_filename=f"{self.model_encoder}_training_log.txt"
         )
 
+        # Log hyperparameters
+        self._log_hyperparameters()
+
     def _log_hyperparameters(self):
         """Log all relevant hyperparameters from config"""
         hyperparams = {
@@ -68,6 +73,10 @@ class Trainer:
             'epochs': self.config.get('training', {}).get('epochs', 50)
         }
         log_hyperparameters(self.logger, hyperparams)
+
+        # Log hyperparameters to ClearML if available
+        if self.task:
+            self.task.connect(hyperparams)
 
     def _create_optimizer(self) -> torch.optim.Optimizer:
         opt_config = self.config.get('optimizer', {})
@@ -226,6 +235,17 @@ class Trainer:
                 train_dice=metrics['train_dice'],
                 val_dice=metrics['val_dice']
             )
+
+            # Log metrics to ClearML if available
+            if self.task:
+                self.task.logger.report_scalar("Loss", "train", metrics['train_loss'], epoch)
+                self.task.logger.report_scalar("Loss", "validation", metrics['val_loss'], epoch)
+                self.task.logger.report_scalar("Accuracy", "train", metrics['train_acc'], epoch)
+                self.task.logger.report_scalar("Accuracy", "validation", metrics['val_acc'], epoch)
+                self.task.logger.report_scalar("IoU", "train", metrics['train_iou'], epoch)
+                self.task.logger.report_scalar("IoU", "validation", metrics['val_iou'], epoch)
+                self.task.logger.report_scalar("Dice", "train", metrics['train_dice'], epoch)
+                self.task.logger.report_scalar("Dice", "validation", metrics['val_dice'], epoch)
 
             print(
                 f'Epoch {epoch}/{num_epochs}, '
