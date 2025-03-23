@@ -1,0 +1,7 @@
+model:
+  name: "segformer"
+  params:
+    pretrained_model: "resnet50"
+    encoder_weights: "imagenet"
+    in_channels: 3
+    classes: 5

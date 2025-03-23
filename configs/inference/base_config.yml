@@ -1,0 +1,44 @@
+# Data configuration
+data:
+  dataset_path: "data/processed"
+  image_size: [256, 256]
+  num_classes: &num_classes 5
+  batch_size: 16
+  patch:
+    size: 256
+    extension: ".tif"
+    split:
+    seed: 1337
+    ratio: [0.8, 0.1, 0.1]
+    zero_threshold: 1
+  color_map:
+    0: [0, 0, 0]
+    1: [222, 31, 7]
+    2: [200, 200, 200]
+    3: [34, 97, 38]
+    4: [0, 69, 255]
+
+# Augmentation configuration
+augmentation:
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+
+# Model configuration
+model:
+  name: "deeplabv3plus"
+  type: "machine_learning"
+  params:
+    encoder_name: "resnet50"
+    encoder_weights: "imagenet"
+    in_channels: 3
+    classes: 5
+
+# Loss configuration
+loss:
+  name: "cross_entropy"
+
+# Inference configuration
+inference:
+  checkpoints: ["checkpoints/cross_entropy_resnet50_deeplabv3plus.pth"]
+  input_path: "data/raw/TrueOrtho_resample/Ortho_Row(241)_Col(322)_resample.tif"
+  output_path: "results/"

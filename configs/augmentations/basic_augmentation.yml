@@ -1,0 +1,28 @@
+augmentation:
+  train:
+    - name: "RandomResizedCrop"
+      params:
+        height: ${data.image_size.0}
+        width: ${data.image_size.1}
+        scale: [0.8, 1.0]
+    - name: "HorizontalFlip"
+      params:
+        p: 0.5
+    - name: "RandomBrightnessContrast"
+      params:
+        brightness_limit: 0.2
+        contrast_limit: 0.2
+        p: 0.5
+    - name: "Normalize"
+      params:
+        mean: ${data.mean}
+        std: ${data.std}
+  val:
+    - name: "Resize"
+      params:
+        height: ${data.image_size.0}
+        width: ${data.image_size.1}
+    - name: "Normalize"
+      params:
+        mean: ${data.mean}
+        std: ${data.std}

@@ -1,0 +1,8 @@
+model:
+  name: 'pspnet'
+  type: 'machine_learning'
+  params:
+    encoder_name: "resnet50"
+    encoder_weights: "imagenet"
+    in_channels: 3
+    classes: 5

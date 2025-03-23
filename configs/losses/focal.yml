@@ -1,0 +1,6 @@
+loss:
+  name: "focal"
+  params:
+    mode: "multiclass"
+    alpha: 0.25
+    gamma: 2.0
