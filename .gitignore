@@ -186,7 +186,12 @@ fabric.properties
 
 .cadence
 /data/*
+!/data/.gitkeep
+
 /checkpoints/*
+!/checkpoints/.gitkeep
+
 /results/*
+!/results/.gitkeep
 
 .vscode
