@@ -42,3 +42,6 @@ inference:
   checkpoints: ["checkpoints/cross_entropy_resnet50_deeplabv3plus.pth"]
   input_path: "data/raw/TrueOrtho_resample/Ortho_Row(241)_Col(322)_resample.tif"
   output_path: "results/"
+
+clearml:
+  project_name: "Aerial Semantic Segmentation"
