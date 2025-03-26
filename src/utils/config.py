@@ -20,7 +20,7 @@ def load_config_from_training_args(args):
 
     if args.config:
         # Load experiment config.py
-        exp_config = load_config(f"{os.path.join(EXPERIMENTS_CONFIG_FOLDER, args.config)}.yml")
+        exp_config = load_config(f"{os.path.join(CONFIG_FOLDER, args.config)}.yml")
         # Merge configs
         config = merge_configs(base_config, exp_config)
     else:
@@ -29,6 +29,11 @@ def load_config_from_training_args(args):
     # Override with command line arguments
     if args.model:
         config = merge_configs(config, load_config(f"{os.path.join(MODELS_CONFIG_FOLDER, args.model)}.yml"))
+    if args.backbone:
+        if 'encoder_name' in config['model']['params'] and config['model']['params']['encoder_name']:
+            config['model']['params']['encoder_name'] = args.backbone
+        else:
+            config['model']['params']['pretrained_model'] = args.backbone
     if args.loss:
         config = merge_configs(config, load_config(f"{os.path.join(LOSSES_CONFIG_FOLDER, args.loss)}.yml"))
     if args.batch_size:
@@ -48,7 +53,7 @@ def load_config_from_inference_args(args):
 
     if args.config:
         # Load experiment config.py
-        exp_config = load_config(f"{os.path.join(EXPERIMENTS_CONFIG_FOLDER, args.config)}.yml")
+        exp_config = load_config(f"{os.path.join(CONFIG_FOLDER, args.config)}.yml")
         # Merge configs
         config = merge_configs(base_config, exp_config) 
     else:
@@ -71,7 +76,7 @@ def load_config_from_inference_args(args):
             config['loss'] = {}
             loss_list = LOSSES
         else:
-            config = merge_configs(config, load_config(f"{os.path.join(LOSSES_CONFIG_FOLDER, args.loss)}.yml"))
+            config = merge_configs(config, load_config(f"{os.path.join(CONFIG_FOLDER, args.loss)}.yml"))
             loss_list = [args.loss]
         
         # Generate checkpoint paths based on model configuration
@@ -88,7 +93,7 @@ def load_config_from_evaluation_args(args):
 
     if args.config:
         # Load experiment config.py
-        exp_config = load_config(f"{os.path.join(EXPERIMENTS_CONFIG_FOLDER, args.config)}.yml")
+        exp_config = load_config(f"{os.path.join(CONFIG_FOLDER, args.config)}.yml")
         # Merge configs
         config = merge_configs(base_config, exp_config) 
     else:
@@ -123,7 +128,16 @@ def load_config_from_evaluation_args(args):
     return config
 
 def load_config_from_process_args(args):
-    config = load_config(args.config)
+    # Load base config.py
+    base_config = load_config(f"{os.path.join(CONFIG_FOLDER, args.base_config)}.yml")
+
+    if args.config:
+        # Load experiment config.py
+        exp_config = load_config(f"{os.path.join(CONFIG_FOLDER, args.config)}.yml")
+        # Merge configs
+        config = merge_configs(base_config, exp_config)
+    else:
+        config = base_config
     
     if args.raw_dir:
         config['dataset_path']['raw'] = args.raw_dir

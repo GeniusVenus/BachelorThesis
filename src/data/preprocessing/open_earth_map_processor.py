@@ -19,6 +19,9 @@ class OpenEarthMapProcessor(BaseDatasetProcessor):
             config (dict): Configuration dictionary containing dataset processing parameters.
         """
         super().__init__(config)
+        self.train_file_path = os.path.join(self.raw_dir, 'reduced_train_1_50.txt')
+        self.val_file_path = os.path.join(self.raw_dir, 'reduced_val_1_50.txt')
+        self.test_file_path = os.path.join(self.raw_dir, 'reduced_test_1_50.txt')
 
     def _process_images(self):
         """Process all datasets in the raw directory."""

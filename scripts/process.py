@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.data.preprocessing.base_processor import process_dataset
+from src.data.preprocessing.process import process_dataset
 from src.utils.argument import parse_process_args
 from src.utils.config import load_config_from_process_args
 

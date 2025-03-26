@@ -12,6 +12,7 @@ def parse_training_args():
     # Override config.py parameters
     parser.add_argument('--model', type=str,
                         help='Model architecture to use (overrides config.py)')
+    parser.add_argument('--backbone', type=str, help='Backbone architecture to use')
     parser.add_argument('--loss', type=str,
                         help='Loss function to use (overrides config.py)')
     parser.add_argument('--batch-size', type=int,
@@ -76,9 +77,10 @@ def parse_process_args():
     parser = argparse.ArgumentParser(description='Dataset processing script')
     
     # Basic arguments
-    parser.add_argument('--config', type=str, default='configs/data/naver.yml',
-                        help='Path to the dataset processing configuration file')
-    
+    parser.add_argument('--base-config', type=str, default='data/base_config',
+                        help='Path to the base dataset processing configuration file')
+    parser.add_argument('--config', type=str, help='Path to the dataset processing configuration file')
+
     # Override config.py parameters
     parser.add_argument('--raw_dir', type=str,
                         help='Path to the raw dataset directory (overrides config)')
