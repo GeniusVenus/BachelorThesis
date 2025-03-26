@@ -1,9 +1,6 @@
 import re
 import cv2
 import os
-import numpy as np
-from patchify import patchify
-import shutil
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 
@@ -24,11 +21,6 @@ class NAVERDatasetProcessor(BaseDatasetProcessor):
 
         # Precompile regex patterns for better performance
         self.row_col_pattern = re.compile(r"Row\(\d+\)_Col\(\d+\)")
-
-        # File lists for dataset splitting
-        self.train_file_path = os.path.join(self.raw_dir, 'train.txt')
-        self.val_file_path = os.path.join(self.raw_dir, 'val.txt')
-        self.test_file_path = os.path.join(self.raw_dir, 'test.txt')
 
         # Input directories for images and masks
         self.input_img_dir = os.path.join(self.raw_dir, 'TrueOrtho_resample')
@@ -143,26 +135,6 @@ class NAVERDatasetProcessor(BaseDatasetProcessor):
 
         return zero_ratio < self.zero_threshold
 
-    def _split_dataset_file(self):
-        """Split the dataset according to predefined file lists."""
-        # Create output directory structure
-        sub_dirs = ['train', 'val', 'test']
-        sub_folders = ['images', 'labels']
-
-        os.makedirs(self.processed_dir, exist_ok=True)
-
-        for sub_dir in sub_dirs:
-            for sub_folder in sub_folders:
-                os.makedirs(os.path.join(self.processed_dir, sub_dir, sub_folder), exist_ok=True)
-
-        # Get file lists for each split - using sets for faster lookups
-        train_images = self._parse_file_list(self.train_file_path)
-        val_images = self._parse_file_list(self.val_file_path)
-        test_images = self._parse_file_list(self.test_file_path)
-
-        # Move files to appropriate directories in parallel
-        self._move_files_to_splits_parallel(train_images, val_images, test_images)
-
     def _parse_file_list(self, file_path):
         """
         Parse a file list and extract pattern identifiers.
@@ -217,57 +189,6 @@ class NAVERDatasetProcessor(BaseDatasetProcessor):
             return os.path.join(self.processed_dir, 'test', subdir)
         else:
             return None
-
-    def _copy_file(self, args):
-        """
-        Copy a file to its destination directory.
-
-        Args:
-            args: Tuple containing (source_path, dest_dir, filename)
-
-        Returns:
-            bool: True if copy was successful
-        """
-        source_path, dest_dir, filename = args
-        try:
-            shutil.copy2(source_path, os.path.join(dest_dir, filename))
-            return True
-        except Exception as e:
-            print(f"Error copying {filename}: {str(e)}")
-            return False
-
-    def _move_files_to_splits_parallel(self, train_images, val_images, test_images):
-        """
-        Move files to their respective split directories in parallel.
-
-        Args:
-            train_images: Set of pattern identifiers for training set
-            val_images: Set of pattern identifiers for validation set
-            test_images: Set of pattern identifiers for test set
-        """
-        # Process each subdirectory in parallel
-        for subdir in ['images', 'labels']:
-            source_dir = os.path.join(self.gen_dir, subdir)
-            filenames = os.listdir(source_dir)
-
-            # Prepare arguments for parallel execution
-            copy_tasks = []
-            for filename in filenames:
-                dest_dir = self._get_destination_dir(filename, subdir, train_images, val_images, test_images)
-                if dest_dir:
-                    source_path = os.path.join(source_dir, filename)
-                    copy_tasks.append((source_path, dest_dir, filename))
-
-            # Copy files in parallel
-            success_count = 0
-            with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
-                futures = [executor.submit(self._copy_file, args) for args in copy_tasks]
-
-                for future in tqdm(as_completed(futures), total=len(futures), desc=f"Copying {subdir}"):
-                    if future.result():
-                        success_count += 1
-
-            print(f"Successfully copied {success_count} of {len(copy_tasks)} {subdir}")
 
 
 def process_naver_dataset(process_config, mode="file"):

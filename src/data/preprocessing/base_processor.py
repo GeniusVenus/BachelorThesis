@@ -4,6 +4,8 @@ import numpy as np
 from patchify import patchify
 import splitfolders
 import shutil
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from tqdm import tqdm
 
 from src.data.preprocessing.open_earth_map_processor import process_openearthmap_dataset
 from src.data.preprocessing.naver_processer import process_naver_dataset
@@ -44,6 +46,11 @@ class BaseDatasetProcessor:
         # Split configuration
         self.split_seed = self.config['patch']['split']['seed']
         self.split_ratio = self.config['patch']['split']['ratio']
+
+        # File lists for dataset splitting (common for both processors)
+        self.train_file_path = os.path.join(self.raw_dir, 'train.txt')
+        self.val_file_path = os.path.join(self.raw_dir, 'val.txt')
+        self.test_file_path = os.path.join(self.raw_dir, 'test.txt')
 
     def _create_directories(self):
         """Create all necessary directories."""
@@ -155,11 +162,109 @@ class BaseDatasetProcessor:
         )
 
     def _split_dataset_file(self):
+        """Split the dataset according to predefined file lists."""
+        # Create output directory structure
+        self._create_split_directories()
+
+        # Get file lists for each split
+        train_images = self._parse_file_list(self.train_file_path)
+        val_images = self._parse_file_list(self.val_file_path)
+        test_images = self._parse_file_list(self.test_file_path)
+
+        # Move files to appropriate directories in parallel
+        self._move_files_to_splits_parallel(train_images, val_images, test_images)
+
+    def _create_split_directories(self):
+        """Create the directory structure for dataset splits."""
+        sub_dirs = ['train', 'val', 'test']
+        sub_folders = ['images', 'labels']
+
+        os.makedirs(self.processed_dir, exist_ok=True)
+
+        for sub_dir in sub_dirs:
+            for sub_folder in sub_folders:
+                os.makedirs(os.path.join(self.processed_dir, sub_dir, sub_folder), exist_ok=True)
+
+    def _parse_file_list(self, file_path):
         """
-        Split the dataset according to predefined file lists.
-        This method should be implemented by subclasses that need file-based splitting.
+        Parse a file list and extract identifiers.
+        This method should be implemented by subclasses.
+
+        Args:
+            file_path: Path to the file containing the list
+
+        Returns:
+            set: Set of identifiers for faster lookups
         """
-        raise NotImplementedError("Subclasses must implement _split_dataset_file method if needed")
+        raise NotImplementedError("Subclasses must implement _parse_file_list method")
+
+    def _get_destination_dir(self, filename, subdir, train_images, val_images, test_images):
+        """
+        Determine the destination directory for a given file.
+        This method should be implemented by subclasses.
+
+        Args:
+            filename: The filename to check
+            subdir: The subdirectory (images or labels)
+            train_images: Set of identifiers for training set
+            val_images: Set of identifiers for validation set
+            test_images: Set of identifiers for test set
+
+        Returns:
+            str: Path to the destination directory or None if no match
+        """
+        raise NotImplementedError("Subclasses must implement _get_destination_dir method")
+
+    def _copy_file(self, args):
+        """
+        Copy a file to its destination directory.
+
+        Args:
+            args: Tuple containing (source_path, dest_dir, filename)
+
+        Returns:
+            bool: True if copy was successful
+        """
+        source_path, dest_dir, filename = args
+        try:
+            shutil.copy2(source_path, os.path.join(dest_dir, filename))
+            return True
+        except Exception as e:
+            print(f"Error copying {filename}: {str(e)}")
+            return False
+
+    def _move_files_to_splits_parallel(self, train_images, val_images, test_images):
+        """
+        Move files to their respective split directories in parallel.
+
+        Args:
+            train_images: Set of identifiers for training set
+            val_images: Set of identifiers for validation set
+            test_images: Set of identifiers for test set
+        """
+        # Process each subdirectory in parallel
+        for subdir in ['images', 'labels']:
+            source_dir = os.path.join(self.gen_dir, subdir)
+            filenames = os.listdir(source_dir)
+
+            # Prepare arguments for parallel execution
+            copy_tasks = []
+            for filename in filenames:
+                dest_dir = self._get_destination_dir(filename, subdir, train_images, val_images, test_images)
+                if dest_dir:
+                    source_path = os.path.join(source_dir, filename)
+                    copy_tasks.append((source_path, dest_dir, filename))
+
+            # Copy files in parallel
+            success_count = 0
+            with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
+                futures = [executor.submit(self._copy_file, args) for args in copy_tasks]
+
+                for future in tqdm(as_completed(futures), total=len(futures), desc=f"Copying {subdir}"):
+                    if future.result():
+                        success_count += 1
+
+            print(f"Successfully copied {success_count} of {len(copy_tasks)} {subdir}")
 
     def _cleanup(self):
         """Clean up temporary files and directories."""
