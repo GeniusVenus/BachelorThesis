@@ -1,7 +1,6 @@
 from src.data.preprocessing.naver_processor import process_naver_dataset
 from src.data.preprocessing.open_earth_map_processor import process_openearthmap_dataset
 
-
 def process_dataset(config):
   if config.get('dataset_name', None) == 'open_earth_map':
     process_openearthmap_dataset(config)

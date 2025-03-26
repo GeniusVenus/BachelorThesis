@@ -1,4 +1,4 @@
-dataset_name: 'naver'
+dataset_name: 'open_earth_map'
 
 dataset_path:
   root: "data"

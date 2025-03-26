@@ -19,16 +19,12 @@ class OpenEarthMapProcessor(BaseDatasetProcessor):
             config (dict): Configuration dictionary containing dataset processing parameters.
         """
         super().__init__(config)
-        self.train_file_path = os.path.join(self.raw_dir, 'reduced_train_1_50.txt')
-        self.val_file_path = os.path.join(self.raw_dir, 'reduced_val_1_50.txt')
-        self.test_file_path = os.path.join(self.raw_dir, 'reduced_test_1_50.txt')
 
     def _process_images(self):
         """Process all datasets in the raw directory."""
         # Find all dataset folders
         dataset_folders = [f for f in os.listdir(self.raw_dir)
-                          if os.path.isdir(os.path.join(self.raw_dir, f)) and
-                          f not in ['train', 'val', 'test']]  # Skip split folders if they exist
+                          if os.path.isdir(os.path.join(self.raw_dir, f))]  # Skip split folders if they exist
 
         print(f"Found {len(dataset_folders)} dataset folders to process")
 
@@ -119,7 +115,7 @@ class OpenEarthMapProcessor(BaseDatasetProcessor):
 
             # Get base filename without extension
             base_name = os.path.splitext(os.path.basename(img_path))[0]
-            original_name = f"{folder_name}_{base_name}"
+            original_name = f"{base_name}"
 
             return self._crop_and_patch(image, mask, original_name)
 
