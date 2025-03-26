@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.data.preprocessing.process import process_dataset
+from src.data.preprocessing.base_processor import process_dataset
 from src.utils.argument import parse_process_args
 from src.utils.config import load_config_from_process_args
 
@@ -19,7 +19,7 @@ def main():
 
     print("==============Configs==============")
     print(config)
-    
+
     # Print configuration
     print("==============Dataset Processing Configuration==============")
     print(f"Raw directory: {config['dataset_path']['raw']}")
@@ -29,11 +29,11 @@ def main():
     print(f"Zero threshold: {config['patch']['zero_threshold']}")
     print(f"Split ratio: {config['patch']['split']['ratio']}")
     print(f"Split seed: {config['patch']['split']['seed']}")
-    
+
     # Process the dataset
     print("\n==============Processing Dataset==============")
     process_dataset(config)
-    
+
     print("\n==============Dataset Processing Complete==============")
     print(f"Processed dataset saved to: {config['dataset_path']['processed']}")
     print(f"Dataset structure:")
