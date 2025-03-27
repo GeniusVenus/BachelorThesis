@@ -164,17 +164,8 @@ class OpenEarthMapProcessor(BaseDatasetProcessor):
             str: Path to the destination directory or None if no match
         """
         # Extract the base name without patch information and folder prefix
-        # Format is typically: folder_name_base_name_patch_i_j.extension
-        parts = os.path.splitext(filename)[0].split('_patch_')[0]
-
-        # Extract the base image name (without folder prefix)
-        # This is what we need to match against the file lists
-        if '_' in parts:
-            # The first part is the folder name, the rest is the base image name
-            folder_prefix, *base_parts = parts.split('_', 1)
-            base_image_name = base_parts[0] if base_parts else ""
-        else:
-            base_image_name = parts
+        # Format is typically: base_name_patch_i_j.extension
+        base_image_name = filename.split("_patch_")[0]
 
         # Check if this base name is in any of the split sets
         if base_image_name in train_images:
