@@ -44,6 +44,7 @@ def load_config_from_training_args(args):
         data_config = load_config(f"{os.path.join(DATA_CONFIG_FOLDER, args.dataset)}.yml")
         config = merge_configs(config, data_config)
         config['model']['params']['classes'] = data_config['data']['num_classes']
+        config['metrics']['num_classes'] = data_config['data']['num_classes']
 
     if args.batch_size:
         config['data']['batch_size'] = args.batch_size

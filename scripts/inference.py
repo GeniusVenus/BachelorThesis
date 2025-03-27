@@ -28,6 +28,7 @@ def setup_clearml_inference(args, config):
     task = Task.init(
         project_name=project_name,
         task_name=task_name,
+        task_type="Inference",
     )
 
     # Connect configuration to the task
