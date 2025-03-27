@@ -15,6 +15,8 @@ def parse_training_args():
     parser.add_argument('--backbone', type=str, help='Backbone architecture to use')
     parser.add_argument('--loss', type=str,
                         help='Loss function to use (overrides config.py)')
+    parser.add_argument('--dataset', type=str,
+                        help='Dataset to use (overrides config.py)')
     parser.add_argument('--batch-size', type=int,
                         help='Batch size (overrides config.py)')
     parser.add_argument('--learning-rate', type=float,
@@ -41,7 +43,7 @@ def parse_training_args():
 
 def parse_evaluation_args():
     parser = argparse.ArgumentParser(description='Evaluation script for semantic segmentation')
-    
+
     # Basic arguments
     parser.add_argument('--config', type=str,
                         help='Path to the experiment config.py file')
@@ -51,8 +53,9 @@ def parse_evaluation_args():
     # Override config.py parameters
     parser.add_argument('--model', type=str, help='Model architecture to use')
     parser.add_argument('--loss', type=str, help='Loss function to use')
-    parser.add_argument('--backbone', type=str, help='Model backbone to use')    
-    
+    parser.add_argument('--backbone', type=str, help='Model backbone to use')
+    parser.add_argument('--dataset', type=str, help='Dataset to use')
+
     return parser.parse_args()
 
 
@@ -69,15 +72,16 @@ def parse_inference_args():
     parser.add_argument('--model', type=str, help='Model architecture to use')
     parser.add_argument('--loss', type=str, help='Loss function to use')
     parser.add_argument('--backbone', type=str, help='Model backbone to use')
+    parser.add_argument('--dataset', type=str, help='Dataset to use')
     parser.add_argument('--input-path', type=str, help='Path to the input image')
-    
+
     return parser.parse_args()
 
 def parse_process_args():
     parser = argparse.ArgumentParser(description='Dataset processing script')
-    
+
     # Basic arguments
-    parser.add_argument('--base-config', type=str, default='data/base_config',
+    parser.add_argument('--base-config', type=str, default='base_config',
                         help='Path to the base dataset processing configuration file')
     parser.add_argument('--config', type=str, help='Path to the dataset processing configuration file')
 
@@ -94,5 +98,5 @@ def parse_process_args():
                         help='Train/val/test split ratio (overrides config)')
     parser.add_argument('--split_seed', type=int,
                         help='Random seed for dataset splitting (overrides config)')
-    
+
     return parser.parse_args()

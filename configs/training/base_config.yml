@@ -4,7 +4,7 @@ augmentation:
 
 # Data configuration
 data:
-  dataset_path: "data/naver_processed"
+  dataset_path: "data/processed"
   image_size: [256, 256]
   num_classes: &num_classes 5
   batch_size: 16
