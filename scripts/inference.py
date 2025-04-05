@@ -28,7 +28,7 @@ def setup_clearml_inference(args, config):
     task = Task.init(
         project_name=project_name,
         task_name=task_name,
-        task_type="Inference",
+        task_type="inference",
     )
 
     # Connect configuration to the task
@@ -53,7 +53,8 @@ def main():
     print(config)
 
     # Setup ClearML for inference
-    task = setup_clearml_inference(args, config)
+    # task = setup_clearml_inference(args, config)
+    task = None
 
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -61,19 +62,24 @@ def main():
     # Initialize model
     model = SegmentationModel.get_model(config['model']['name'], **config['model'].get('params', {}))
 
-    input_path = config['inference']['input_path']
-    output_path = config['inference']['output_path']
+    input_paths = config['inference']['inputs']
+    output_path = config['inference']['output']
 
     for checkpoint in config['inference']['checkpoints']:
         load_checkpoint(model, checkpoint)
 
         # Log the checkpoint being used
-        task.logger.report_text(f"Using checkpoint: {checkpoint}")
+        # task.logger.report_text(f"Using checkpoint: {checkpoint}")
 
         # Initialize predictor
         predictor = Predictor(model=model, config=config, device=device, task=task)
+        
+        for input_path in input_paths:
+            # Log the input image being processed
+            # task.logger.report_text(f"Processing input: {input_path}")
 
-        predictor.predict_large_image(input_path, output_path)
+            # Perform inference
+            predictor.predict_large_image(input_path, output_path)
 
 if __name__ == '__main__':
     main()

@@ -111,9 +111,12 @@ class Predictor:
         # Convert BGR to RGB for processing
         original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
 
+        # Get the base filename without extension
+        base_name = os.path.splitext(os.path.basename(image_path))[0]
+        
         # Log the input image to ClearML if available
         if self.task:
-            self.task.logger.report_image("Input", "Original Image",
+            self.task.logger.report_image("Input", base_name,
                                          image=original_image, iteration=0)
 
         # Calculate size divisible by patch_size
@@ -138,6 +141,7 @@ class Predictor:
             self.patch_size,
             1
         ))
+        
 
         # Process each patch
         for i in tqdm(range(patches_img.shape[0]), desc="Processing rows"):
@@ -170,15 +174,12 @@ class Predictor:
 
         # Log the prediction to ClearML if available
         if self.task:
-            self.task.logger.report_image("Predictions", "Segmentation Mask",
+            self.task.logger.report_image("Prediction", base_name,
                                          image=colored_mask, iteration=0)
 
         # Save the result if save_dir is provided
         if save_dir is not None:
             os.makedirs(save_dir, exist_ok=True)
-
-            # Get the base filename without extension
-            base_name = os.path.splitext(os.path.basename(image_path))[0]
 
             # Save the raw prediction mask
             mask_path = os.path.join(save_dir, f"{base_name}_pred_mask.png")
@@ -242,6 +243,7 @@ class Predictor:
 
             # Ensure labels and values match and are in the same order
             labels = [str(i) for i in sorted(class_counts.keys())]
+            detailed_labels = [f"Class {label}" for label in labels]
             values = [class_percentages[label] for label in labels]
 
             # Report class distribution as a bar chart
@@ -250,8 +252,8 @@ class Predictor:
                     "Class Distribution",
                     "Percentage of Pixels",
                     values=values,
-                    labels=labels,
-                    iteration=0
+                    labels=detailed_labels,
+                    iteration=0,
                 )
 
                 # Also log as scalars for easier tracking
@@ -265,7 +267,7 @@ class Predictor:
             except Exception as e:
                 # Fallback to just logging text if histogram fails
                 self.task.logger.report_text(
-                    f"Class distribution: {', '.join(f'Class {l}: {v:.2f}%' for l, v in zip(labels, values))}"
+                    f"Class distribution: {', '.join(f'{l}: {v:.2f}%' for l, v in zip(detailed_labels, values))}"
                 )
                 print(f"Warning: Failed to report histogram: {str(e)}")
 

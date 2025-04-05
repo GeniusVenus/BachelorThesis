@@ -2,6 +2,7 @@ import yaml
 import os
 
 CONFIG_FOLDER = 'configs'
+CHECKPOINT_FOLDER = 'checkpoints'
 AUGMENTATIONS_CONFIG_FOLDER = 'configs/augmentations'
 DATA_CONFIG_FOLDER = 'configs/data'
 PROCESS_CONFIG_FOLDER = 'configs/process'
@@ -89,14 +90,20 @@ def load_config_from_inference_args(args):
             config['loss'] = {}
             loss_list = LOSSES
         else:
-            config = merge_configs(config, load_config(f"{os.path.join(CONFIG_FOLDER, args.loss)}.yml"))
+            config = merge_configs(config, load_config(f"{os.path.join(LOSSES_CONFIG_FOLDER, args.loss)}.yml"))
             loss_list = [args.loss]
 
         # Generate checkpoint paths based on model configuration
         for loss_name in loss_list:
-            backbone = config['model']['params']['pretrained_model'] if 'pretrained_model' in config['model']['params'] else config['model']['params']['encoder_name']
+            if 'pretrained_model' in config['model']['params']:
+                backbone = config['model']['params']['pretrained_model']
+            else:
+                backbone = config['model']['params']['encoder_name']
             checkpoint_path = f"{loss_name}_{backbone}_{config['model']['name']}.pth"
-            config['inference']['checkpoints'].append(checkpoint_path)
+            config['inference']['checkpoints'].append(os.path.join(CHECKPOINT_FOLDER, checkpoint_path))
+
+    if args.checkpoint:
+        config['inference']['checkpoints'] = [os.path.join(CHECKPOINT_FOLDER, f"{args.checkpoint}.pth")]
 
     if args.dataset:
         data_config = load_config(f"{os.path.join(DATA_CONFIG_FOLDER, args.dataset)}.yml")
@@ -139,7 +146,10 @@ def load_config_from_evaluation_args(args):
 
         # Generate checkpoint paths based on model configuration
         for loss_name in loss_list:
-            backbone = config['model']['params']['pretrained_model'] if 'pretrained_model' in config['model']['params'] else config['model']['params']['encoder_name']
+            if 'pretrained_model' in config['model']['params']:
+                backbone = config['model']['params']['pretrained_model']
+            else:
+                backbone = config['model']['params']['encoder_name']
             checkpoint_path = f"{loss_name}_{backbone}_{config['model']['name']}.pth"
             config['evaluation']['checkpoints'].append(checkpoint_path)
 

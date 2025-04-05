@@ -31,7 +31,8 @@ class Trainer:
 
         self.model_name = config['model']['name']
         self.model_type = config['model']['type']
-        self.model_encoder = config['model']['params']['encoder_name'] if config['model']['params']['encoder_name'] is not None else config['model']['params']['pretrained_model']
+        self.model_encoder = config['model']['params'].get('encoder_name') or config['model']['params'].get(
+            'pretrained_model')
 
         self.model_checkpoint = config['training']['model_checkpoint']
 
@@ -51,12 +52,13 @@ class Trainer:
         self.metric_meters = metric_meters
         self.best_val_loss = float('inf')
 
+        safe_model_encoder = self.model_encoder.replace('/', '_').replace('\\', '_')
         # Setup logger
         self.logger = setup_logger(
             log_folder=f"{self.project_root}/logs/{self.model_name}",
             log_folder_name=self.loss_name,
-            json_log_filename=f"{self.model_encoder}_training_log.json",
-            text_log_filename=f"{self.model_encoder}_training_log.txt"
+            json_log_filename=f"{safe_model_encoder}_training_log.json",
+            text_log_filename=f"{safe_model_encoder}_training_log.txt"
         )
 
         # Log hyperparameters
@@ -176,7 +178,11 @@ class Trainer:
 
             with torch.amp.autocast("cuda"):
                 y_pred = self.model(x)
-                output = y_pred.logits if self.model_type == 'transformer' else y_pred
+                if self.model_type == 'transformer' and hasattr(y_pred, 'logits'):
+                    output = y_pred.logits
+                else:
+                    output = y_pred
+
                 if self.model_type == 'transformer':
                     output = F.interpolate(output, size=y.shape[1:], mode='bilinear', align_corners=False)
                 loss = self.loss_fn(output, y)
@@ -200,7 +206,10 @@ class Trainer:
 
                 with torch.amp.autocast("cuda"):
                     y_pred = self.model(x)
-                    output = y_pred.logits if self.model_type == 'transformer' else y_pred
+                    if self.model_type == 'transformer' and hasattr(y_pred, 'logits'):
+                        output = y_pred.logits
+                    else:
+                        output = y_pred
                     if self.model_type == 'transformer':
                         output = F.interpolate(output, size=y.shape[1:], mode='bilinear', align_corners=False)
                     loss = self.loss_fn(output, y)
