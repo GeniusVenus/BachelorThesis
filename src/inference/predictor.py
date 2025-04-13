@@ -85,10 +85,11 @@ class Predictor:
             # Handle different model output formats
             if self.model_type == 'transformer':
                 output = output.logits
+                output = F.interpolate(output, size=(256, 256), mode='bilinear', align_corners=False)
 
             # Apply softmax and get class predictions
-            probs = F.softmax(output, dim=1)
-            pred_mask = torch.argmax(probs, dim=1).squeeze().cpu().numpy()
+            probs = torch.softmax(output, dim=1)
+            pred_mask = torch.argmax(probs, dim=1).squeeze(0).cpu().numpy()
 
             return pred_mask
 
