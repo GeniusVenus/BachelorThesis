@@ -37,6 +37,13 @@ class Predictor:
 
         # Extract model type for handling different model outputs
         self.model_type = config['model']['type']
+        self.model_name = config['model']['name']
+        if 'encoder_name' in config['model']['params']:
+            self.backbone_name = config['model']['params']['encoder_name']
+        else:
+            self.backbone_name = config['model']['params']['pretrained_model'].split('/')[-1]
+
+        self.loss_name = config['loss']['name']
 
         # Get patch size from config
         self.patch_size = config['data']['patch']['size']
@@ -182,12 +189,14 @@ class Predictor:
         if save_dir is not None:
             os.makedirs(save_dir, exist_ok=True)
 
+            prefix = f"{self.loss_name}_{self.model_name}_{self.backbone_name}_{base_name}"
+
             # Save the raw prediction mask
-            mask_path = os.path.join(save_dir, f"{base_name}_pred_mask.png")
+            mask_path = os.path.join(save_dir, f"{prefix}_pred_mask.png")
             cv2.imwrite(mask_path, result_mask)
 
             # Save the colored visualization
-            colored_path = os.path.join(save_dir, f"{base_name}_pred_colored.png")
+            colored_path = os.path.join(save_dir, f"{prefix}_pred_colored.png")
             cv2.imwrite(colored_path, cv2.cvtColor(colored_mask, cv2.COLOR_RGB2BGR))
 
             # Log the saved file paths to ClearML if available
@@ -196,8 +205,8 @@ class Predictor:
                 self.task.logger.report_text(f"Saved colored visualization to: {colored_path}")
 
                 # Upload the files as artifacts
-                self.task.upload_artifact(f"{base_name}_mask", mask_path)
-                self.task.upload_artifact(f"{base_name}_colored", colored_path)
+                self.task.upload_artifact(f"{prefix}_mask", mask_path)
+                self.task.upload_artifact(f"{prefix}_colored", colored_path)
 
         return result_mask
 
