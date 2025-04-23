@@ -4,6 +4,7 @@ augmentation:
 
 # Data configuration
 data:
+  name: "naver"
   dataset_path: "data/naver_processed"
   image_size: [256, 256]
   num_classes: &num_classes 5
@@ -56,7 +57,7 @@ metrics:
 # Training configuration
 training:
   epochs: 5
-  model_checkpoint: "checkpoints/unet.pth"
+  model_checkpoint: "checkpoints/model.pth"
 
 # ClearML configuration
 clearml:

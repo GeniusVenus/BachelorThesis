@@ -20,9 +20,11 @@ os.environ['CLEARML_CONFIG_FILE'] = '../clearml.conf'
 def setup_clearml(args, config):
     """Setup ClearML task for experiment tracking"""
     # Create a task
-    if config['model']['params']['encoder_name']:
+    if 'encoder_name' in config['model']['params']:
+        backbone = config['model']['params']['encoder_name']
         task_name = f"{config['loss']['name']}_{config['model']['params']['encoder_name']}_{config['model']['name']}"
     else:
+        backbone = config['model']['params']['pretrained_model']
         task_name = f"{config['loss']['name']}_{config['model']['params']['pretrained_model']}_{config['model']['name']}"
 
     project_name = config.get('clearml', {}).get('project_name', 'Segmentation')
@@ -30,6 +32,7 @@ def setup_clearml(args, config):
     task = Task.init(
         project_name=project_name,
         task_name=task_name,
+        tags=[config['loss']['name'], config['model']['name'], backbone, config['data']['name']],
     )
 
     # Connect configuration to the task
@@ -54,8 +57,8 @@ def main():
     print(config)
 
     # Setup ClearML
-    # task = setup_clearml(args, config)
-    task = None
+    task = setup_clearml(args, config)
+    # task = None
 
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
