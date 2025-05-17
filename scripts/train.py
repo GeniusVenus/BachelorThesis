@@ -15,7 +15,7 @@ from src.utils.metric import AverageMeter
 
 from clearml import Task
 
-os.environ['CLEARML_CONFIG_FILE'] = '../clearml.conf'
+# os.environ['CLEARML_CONFIG_FILE'] = '../clearml.conf'
 
 def setup_clearml(args, config):
     """Setup ClearML task for experiment tracking"""

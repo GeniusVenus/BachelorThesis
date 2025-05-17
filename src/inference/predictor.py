@@ -234,53 +234,6 @@ class Predictor:
             colored_mask[binary_mask, 1] = color[1]  # G
             colored_mask[binary_mask, 2] = color[2]  # B
 
-        # Log class distribution to ClearML if available
-        if self.task:
-            # Ensure all classes in the color map are included in the distribution
-            class_counts = {}
-            total_pixels = mask.size
-
-            # Initialize all classes with zero count
-            for class_idx in self.color_map.keys():
-                class_idx_int = int(class_idx)
-                class_counts[class_idx_int] = np.sum(mask == class_idx_int)
-
-            # Calculate percentages
-            class_percentages = {
-                str(class_idx): (count / total_pixels) * 100
-                for class_idx, count in class_counts.items()
-            }
-
-            # Ensure labels and values match and are in the same order
-            labels = [str(i) for i in sorted(class_counts.keys())]
-            detailed_labels = [f"Class {label}" for label in labels]
-            values = [class_percentages[label] for label in labels]
-
-            # Report class distribution as a bar chart
-            try:
-                self.task.logger.report_histogram(
-                    "Class Distribution",
-                    "Percentage of Pixels",
-                    values=values,
-                    labels=detailed_labels,
-                    iteration=0,
-                )
-
-                # Also log as scalars for easier tracking
-                for label, value in zip(labels, values):
-                    self.task.logger.report_scalar(
-                        "Class Percentages",
-                        f"Class {label}",
-                        value,
-                        iteration=0
-                    )
-            except Exception as e:
-                # Fallback to just logging text if histogram fails
-                self.task.logger.report_text(
-                    f"Class distribution: {', '.join(f'{l}: {v:.2f}%' for l, v in zip(detailed_labels, values))}"
-                )
-                print(f"Warning: Failed to report histogram: {str(e)}")
-
         return colored_mask
 
     def predict_directory(self, input_dir: str, output_dir: str, file_extension: str = '.tif'):

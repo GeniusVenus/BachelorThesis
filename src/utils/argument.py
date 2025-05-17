@@ -54,6 +54,7 @@ def parse_evaluation_args():
     parser.add_argument('--model', type=str, help='Model architecture to use')
     parser.add_argument('--loss', type=str, help='Loss function to use')
     parser.add_argument('--backbone', type=str, help='Model backbone to use')
+    parser.add_argument('--checkpoint', type=str, help='Path to checkpoint to load')
     parser.add_argument('--dataset', type=str, help='Dataset to use')
 
     return parser.parse_args()

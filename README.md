@@ -2,26 +2,18 @@
 
 ## Training script
 
-### Basic training script
-
 ```
-python scripts/train.py --config experiment_001
-```
-
-### Training with overridden parameters
-
-```
-python scripts/train.py --config experiment_001 --model deeplabv3plus --batch-size 16 --learning-rate 0.001 --epochs 100
+ python scripts/train.py --loss cross_entropy --backbone resnet50 --model deeplabv3plus  --epochs 50 --checkpoint naver_cross_entropy_resnet50_deeplabv3plus --dataset naver
 ```
 
 ## Evaluate script
 
 ```
-python scripts/inference.py
+python scripts/evaluation.py --loss cross_entropy --backbone resnet50 --model deeplabv3plus --dataset naver
 ```
 
 ## Inference script
 
 ```
-python scripts/inference.py --config experiment_001 --model deeplabv3plus --backbone resnet50 --loss all
+python scripts/inference.py --loss cross_entropy --backbone resnet50 --model deeplabv3plus --dataset naver
 ```

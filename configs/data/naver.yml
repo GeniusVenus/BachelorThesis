@@ -13,3 +13,9 @@ data:
     2: [200, 200, 200]
     3: [34, 97, 38]
     4: [0, 69, 255]
+  labels:
+    0: "Background"
+    1: "Building"
+    2: "Road"
+    3: "Tree"
+    4: "Water"

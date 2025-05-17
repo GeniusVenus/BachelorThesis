@@ -2,20 +2,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import os
-import json
 from typing import Dict, Any, List, Optional, Tuple
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from src.utils.metric import AverageMeter
 import torchmetrics
+from clearml import Task
 
 class Evaluator:
     def __init__(
         self,
         model: nn.Module,
         config: Dict[str, Any],
-        device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+        task: Optional[Task] = None  # Add ClearML task parameter
     ):
         """
         Initialize the Evaluator.
@@ -24,10 +24,12 @@ class Evaluator:
             model: The trained model to evaluate
             config: Configuration dictionary
             device: Device to run the model on
+            task: ClearML Task for logging (optional)
         """
         self.model = model
         self.config = config
         self.device = device
+        self.task = task  # Store ClearML task
         self.model.to(self.device)
         self.model.eval()
         
@@ -45,7 +47,9 @@ class Evaluator:
         self.torchmetrics = {
             'iou': torchmetrics.JaccardIndex(num_classes=self.num_classes, task=metrics_config['task'],
                                             average=metrics_config['average']).to(self.device),
-            'dice': torchmetrics.Dice(num_classes=self.num_classes, average=metrics_config['average']).to(self.device)
+            'dice': torchmetrics.Dice(num_classes=self.num_classes, average=metrics_config['average']).to(self.device),
+            'accuracy': torchmetrics.Accuracy(task=metrics_config['task'], num_classes=self.num_classes,
+                                            average=metrics_config['average']).to(self.device)
         }
         
         # Add per-class metrics
@@ -56,6 +60,11 @@ class Evaluator:
                 average=metrics_config['average']
             ).to(self.device)
             self.torchmetrics[f'dice_class_{i}'] = torchmetrics.Dice(
+                num_classes=self.num_classes,
+                average=metrics_config['average']
+            ).to(self.device)
+            self.torchmetrics[f'accuracy_class_{i}'] = torchmetrics.Accuracy(
+                task=metrics_config['task'],
                 num_classes=self.num_classes,
                 average=metrics_config['average']
             ).to(self.device)
@@ -70,13 +79,15 @@ class Evaluator:
         metrics = {
             'loss': AverageMeter(),
             'iou': AverageMeter(),
-            'dice': AverageMeter()
+            'dice': AverageMeter(),
+            'accuracy': AverageMeter()
         }
         
-        # Add per-class IoU and Dice metrics
+        # Add per-class metrics
         for i in range(self.num_classes):
             metrics[f'iou_class_{i}'] = AverageMeter()
             metrics[f'dice_class_{i}'] = AverageMeter()
+            metrics[f'accuracy_class_{i}'] = AverageMeter()
             
         return metrics
     
@@ -105,24 +116,25 @@ class Evaluator:
         # Update torchmetrics
         iou_value = self.torchmetrics['iou'](y_pred, y_true)
         dice_value = self.torchmetrics['dice'](y_pred, y_true)
+        accuracy_value = self.torchmetrics['accuracy'](y_pred, y_true)
         
         self.metrics['iou'].update(iou_value.item(), batch_size)
         self.metrics['dice'].update(dice_value.item(), batch_size)
+        self.metrics['accuracy'].update(accuracy_value.item(), batch_size)
         
         # Update per-class metrics
         for i in range(self.num_classes):
-            # Calculate per-class metrics directly
-            # Create one-hot masks for the specific class
             class_pred = (y_pred == i).long()
             class_true = (y_true == i).long()
             
-            # Calculate IoU and Dice for this specific class
-            if class_true.sum() > 0 or class_pred.sum() > 0:  # Only calculate if class exists in batch
+            if class_true.sum() > 0 or class_pred.sum() > 0:
                 class_iou = self.torchmetrics['iou'](class_pred, class_true)
                 class_dice = self.torchmetrics['dice'](class_pred, class_true)
+                class_accuracy = self.torchmetrics['accuracy'](class_pred, class_true)
                 
                 self.metrics[f'iou_class_{i}'].update(class_iou.item(), batch_size)
                 self.metrics[f'dice_class_{i}'].update(class_dice.item(), batch_size)
+                self.metrics[f'accuracy_class_{i}'].update(class_accuracy.item(), batch_size)
     
     def evaluate_dataloader(self, dataloader: DataLoader, criterion: nn.Module) -> Dict[str, float]:
         """
@@ -169,6 +181,63 @@ class Evaluator:
         
         return results
     
+    def _log_metrics_to_clearml(self, results: Dict[str, float], split_name: str, iteration: int = 0):
+        """
+        Log metrics to ClearML.
+        
+        Args:
+            results: Dictionary containing metric results
+            split_name: Name of the data split
+            iteration: Iteration number for logging
+        """
+        if not self.task:
+            return
+
+        # Get labels from config, defaulting to class indices if not found
+        label_map = self.config['data'].get('labels', {})
+        
+        # Report overall metrics as text
+        overall_metrics_text = (
+            f"{split_name} Overall Metrics:\n"
+            f"Loss: {results['loss']:.4f}\n"
+            f"IoU: {results['iou']:.4f}\n"
+            f"Dice: {results['dice']:.4f}\n"
+            f"Accuracy: {results['accuracy']:.4f}"
+        )
+        self.task.logger.report_text(overall_metrics_text)
+
+        # Report per-class metrics
+        for i in range(self.num_classes):
+            class_name = label_map.get(i, f"Class {i}")
+            
+            # Report as individual scalars
+            self.task.logger.report_histogram(
+                title=f"{split_name}/Per-Class IoU",
+                series=class_name,
+                values=results[f'iou_class_{i}'],
+                iteration=iteration,
+                xaxis="Class",
+                yaxis="IoU",
+            )
+            
+            self.task.logger.report_histogram(
+                title=f"{split_name}/Per-Class Dice",
+                series=class_name,
+                values=results[f'dice_class_{i}'],
+                iteration=iteration,
+                xaxis="Class",
+                yaxis="Dice"
+            )
+            
+            self.task.logger.report_histogram(
+                title=f"{split_name}/Per-Class Accuracy",
+                series=class_name,
+                values=results[f'accuracy_class_{i}'],
+                iteration=iteration, 
+                xaxis="Class",
+                yaxis="Accuracy"
+            )
+
     def evaluate_split(self, split_dataloader: DataLoader, criterion: nn.Module, split_name: str = "val") -> Dict[str, float]:
         """
         Evaluate the model on a specific data split.
@@ -185,6 +254,7 @@ class Evaluator:
         results = self.evaluate_dataloader(split_dataloader, criterion)
         
         # Print results
+        print(f"{split_name.capitalize()} Accuracy: {results['accuracy']:.4f}")
         print(f"{split_name.capitalize()} Loss: {results['loss']:.4f}")
         print(f"{split_name.capitalize()} IoU: {results['iou']:.4f}")
         print(f"{split_name.capitalize()} Dice: {results['dice']:.4f}")
@@ -192,7 +262,13 @@ class Evaluator:
         # Print per-class metrics
         print(f"\nPer-class metrics for {split_name} split:")
         for i in range(self.num_classes):
-            print(f"Class {i}: IoU = {results[f'iou_class_{i}']:.4f}, Dice = {results[f'dice_class_{i}']:.4f}")
+            print(f"Class {i}: IoU = {results[f'iou_class_{i}']:.4f}, "
+                  f"Dice = {results[f'dice_class_{i}']:.4f}, "
+                  f"Accuracy = {results[f'accuracy_class_{i}']:.4f}")
+        
+        # Log metrics to ClearML
+        if self.task:
+            self._log_metrics_to_clearml(results, split_name)
         
         return results
     

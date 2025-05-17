@@ -9,7 +9,6 @@ PROCESS_CONFIG_FOLDER = 'configs/process'
 EXPERIMENTS_CONFIG_FOLDER = 'configs/experiments'
 LOSSES_CONFIG_FOLDER = 'configs/losses'
 MODELS_CONFIG_FOLDER = 'configs/models'
-LOSSES = ['cross_entropy','focal', 'dice', 'tversky', 'jaccard', 'lovasz']
 
 def load_config(config_path):
     with open(config_path) as f:
@@ -84,31 +83,21 @@ def load_config_from_inference_args(args):
             config['model']['params']['pretrained_model'] = args.backbone
 
     if args.loss:
-        config['inference']['checkpoints'] = []
-
-        if args.loss == 'all' or config['loss'] == {}:
-            config['loss'] = {}
-            loss_list = LOSSES
-        else:
-            config = merge_configs(config, load_config(f"{os.path.join(LOSSES_CONFIG_FOLDER, args.loss)}.yml"))
-            loss_list = [args.loss]
-
-        # Generate checkpoint paths based on model configuration
-        for loss_name in loss_list:
-            if 'pretrained_model' in config['model']['params']:
-                backbone = config['model']['params']['pretrained_model']
-            else:
-                backbone = config['model']['params']['encoder_name']
-            checkpoint_path = f"{loss_name}_{backbone}_{config['model']['name']}.pth"
-            config['inference']['checkpoints'].append(os.path.join(CHECKPOINT_FOLDER, checkpoint_path))
-
-    if args.checkpoint:
-        config['inference']['checkpoints'] = [os.path.join(CHECKPOINT_FOLDER, f"{args.checkpoint}.pth")]
+        config = merge_configs(config, load_config(f"{os.path.join(LOSSES_CONFIG_FOLDER, args.loss)}.yml"))
 
     if args.dataset:
         data_config = load_config(f"{os.path.join(DATA_CONFIG_FOLDER, args.dataset)}.yml")
         config = merge_configs(config, data_config)
         config['model']['params']['classes'] = data_config['data']['num_classes']
+
+    if args.checkpoint:
+        config['evaluation']['checkpoint'] = f"checkpoints/{args.checkpoint}.pth"
+    else:
+        if 'pretrained_model' in config['model']['params']:
+            backbone = config['model']['params']['pretrained_model']
+        else:
+            backbone = config['model']['params']['encoder_name']
+        config['inference']['checkpoint'] = f"checkpoints/{config['data']['name']}_{config['loss']['name']}_{backbone}_{config['model']['name']}.pth"
 
     return config
 
@@ -135,28 +124,21 @@ def load_config_from_evaluation_args(args):
             config['model']['params']['pretrained_model'] = args.backbone
 
     if args.loss:
-        config['inference']['checkpoints'] = []
-
-        if args.loss == 'all' or config['loss'] == {}:
-            config['loss'] = {}
-            loss_list = LOSSES
-        else:
-            config = merge_configs(config, load_config(f"{os.path.join(LOSSES_CONFIG_FOLDER, args.loss)}.yml"))
-            loss_list = [args.loss]
-
-        # Generate checkpoint paths based on model configuration
-        for loss_name in loss_list:
-            if 'pretrained_model' in config['model']['params']:
-                backbone = config['model']['params']['pretrained_model']
-            else:
-                backbone = config['model']['params']['encoder_name']
-            checkpoint_path = f"{loss_name}_{backbone}_{config['model']['name']}.pth"
-            config['evaluation']['checkpoints'].append(checkpoint_path)
+        config = merge_configs(config, load_config(f"{os.path.join(LOSSES_CONFIG_FOLDER, args.loss)}.yml"))
 
     if args.dataset:
         data_config = load_config(f"{os.path.join(DATA_CONFIG_FOLDER, args.dataset)}.yml")
         config = merge_configs(config, data_config)
         config['model']['params']['classes'] = data_config['data']['num_classes']
+        
+    if args.checkpoint:
+        config['evaluation']['checkpoint'] = args.checkpoint
+    else:
+        if 'pretrained_model' in config['model']['params']:
+            backbone = config['model']['params']['pretrained_model']
+        else:
+            backbone = config['model']['params']['encoder_name']
+        config['evaluation']['checkpoint'] = f"checkpoints/{config['data']['name']}_{config['loss']['name']}_{backbone}_{config['model']['name']}.pth"
 
     return config
 

@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Define arrays for all options
-MODELS=("deeplabv3plus" "pspnet" "fpn" "unet" "segformer" "upernet")
+MODELS=("upernet")
 LOSS_FUNCTIONS=("cross_entropy" "dice" "focal" "jaccard" "lovasz" "tversky")
-DATASETS=("naver" "open_earth_map")
+DATASETS=("open_earth_map")
 EPOCHS=50
-BATCH_SIZE=32
+BATCH_SIZE=16
 
 # Define log directory and file explicitly
 LOG_DIR="./logs"  # Current directory/logs
@@ -36,6 +36,7 @@ echo "----------------------------------------" | tee -a "$LOG_FILE"
 # Function to determine backbone based on model
 get_backbone_info() {
     local model=$1
+    local backbone_override=$2
 
     if [[ "$model" == "segformer" ]]; then
         # For SegFormer, use NVIDIA MIT-b3, but checkpoint name shows mit_b3
@@ -45,8 +46,17 @@ get_backbone_info() {
         # For UperNet, use openmmlab/upernet-convnext-base, but checkpoint name shows convnext_base
         BACKBONE_PARAM="openmmlab/upernet-convnext-base"
         BACKBONE_NAME="convnext_base"
+    elif [[ "$model" == "unet" ]]; then
+        # For UNet, use specified backbone or default to resnet50
+        if [[ -n "$backbone_override" ]]; then
+            BACKBONE_PARAM="$backbone_override"
+            BACKBONE_NAME="$backbone_override"
+        else
+            BACKBONE_PARAM="resnet50"
+            BACKBONE_NAME="resnet50"
+        fi
     else
-        # For other models (deeplabv3plus, unet, pspnet, fpn, etc.), use resnet50 for both
+        # For other models (deeplabv3plus, pspnet, fpn, etc.), use resnet50 for both
         BACKBONE_PARAM="resnet50"
         BACKBONE_NAME="resnet50"
     fi
@@ -58,13 +68,24 @@ mkdir -p checkpoints
 # Track total and completed runs
 total_combinations=0
 completed_combinations=0
+skipped_combinations=0
 
 # Count combinations
 for DATASET in "${DATASETS[@]}"; do
     for MODEL in "${MODELS[@]}"; do
-        for LOSS in "${LOSS_FUNCTIONS[@]}"; do
-            total_combinations=$((total_combinations + 1))
-        done
+        if [[ "$MODEL" == "unet" ]]; then
+            # UNet has two backbones: vgg11 and resnet50
+            for BACKBONE in "vgg11" "resnet50"; do
+                for LOSS in "${LOSS_FUNCTIONS[@]}"; do
+                    total_combinations=$((total_combinations + 1))
+                done
+            done
+        else
+            # Other models use their default backbone
+            for LOSS in "${LOSS_FUNCTIONS[@]}"; do
+                total_combinations=$((total_combinations + 1))
+            done
+        fi
     done
 done
 
@@ -77,42 +98,62 @@ for DATASET in "${DATASETS[@]}"; do
     echo "----------------------------------------" | tee -a "$LOG_FILE"
 
     for MODEL in "${MODELS[@]}"; do
-        # Get backbone info for this model
-        get_backbone_info "$MODEL"
+        if [[ "$MODEL" == "unet" ]]; then
+            # For UNet, use both vgg11 and resnet50 backbones
+            BACKBONES=("vgg11" "resnet50")
+        else
+            # For other models, use the default backbone
+            BACKBONES=("")
+        fi
 
-        echo "Using model: $MODEL with backbone: $BACKBONE_PARAM" | tee -a "$LOG_FILE"
+        for BACKBONE_OVERRIDE in "${BACKBONES[@]}"; do
+            # Get backbone info for this model
+            get_backbone_info "$MODEL" "$BACKBONE_OVERRIDE"
 
-        for LOSS in "${LOSS_FUNCTIONS[@]}"; do
-            # Generate checkpoint name using the display name for the backbone
-            CHECKPOINT="${DATASET}_${LOSS}_${BACKBONE_NAME}_${MODEL}"
+            echo "Using model: $MODEL with backbone: $BACKBONE_PARAM" | tee -a "$LOG_FILE"
 
-            # Log the current combination
-            echo "----------------------------------------" | tee -a "$LOG_FILE"
-            echo "Training $CHECKPOINT ($(($completed_combinations + 1))/$total_combinations)" | tee -a "$LOG_FILE"
-            echo "Using dataset=$DATASET, model=$MODEL, backbone=$BACKBONE_PARAM, loss=$LOSS" | tee -a "$LOG_FILE"
-            echo "Started at $(date)" | tee -a "$LOG_FILE"
+            for LOSS in "${LOSS_FUNCTIONS[@]}"; do
+                # Generate checkpoint name using the display name for the backbone
+                CHECKPOINT="${DATASET}_${LOSS}_${BACKBONE_NAME}_${MODEL}"
+                CHECKPOINT_FILE="checkpoints/${CHECKPOINT}.pth"
 
-            # Run the training command with the actual backbone parameter
-            python scripts/train.py \
-                --model $MODEL \
-                --backbone "$BACKBONE_PARAM" \
-                --loss $LOSS \
-                --epochs $EPOCHS \
-                --batch_size $BATCH_SIZE \
-                --checkpoint $CHECKPOINT \
-                --dataset $DATASET | tee -a "$LOG_FILE"
+                # Check if checkpoint already exists
+                if [ -f "$CHECKPOINT_FILE" ]; then
+                    echo "----------------------------------------" | tee -a "$LOG_FILE"
+                    echo "Skipping $CHECKPOINT ($(($completed_combinations + $skipped_combinations + 1))/$total_combinations)" | tee -a "$LOG_FILE"
+                    echo "Checkpoint already exists at: $CHECKPOINT_FILE" | tee -a "$LOG_FILE"
+                    skipped_combinations=$((skipped_combinations + 1))
+                    continue
+                fi
 
-            # Check if training was successful
-            if [ $? -eq 0 ]; then
-                echo "Successfully completed $CHECKPOINT at $(date)" | tee -a "$LOG_FILE"
-            else
-                echo "Failed to train $CHECKPOINT at $(date)" | tee -a "$LOG_FILE"
-            fi
+                # Log the current combination
+                echo "----------------------------------------" | tee -a "$LOG_FILE"
+                echo "Training $CHECKPOINT ($(($completed_combinations + $skipped_combinations + 1))/$total_combinations)" | tee -a "$LOG_FILE"
+                echo "Using dataset=$DATASET, model=$MODEL, backbone=$BACKBONE_PARAM, loss=$LOSS" | tee -a "$LOG_FILE"
+                echo "Started at $(date)" | tee -a "$LOG_FILE"
 
-            completed_combinations=$((completed_combinations + 1))
+                # Run the training command with the actual backbone parameter
+                python scripts/train.py \
+                    --model $MODEL \
+                    --backbone "$BACKBONE_PARAM" \
+                    --loss $LOSS \
+                    --epochs $EPOCHS \
+                    --batch-size $BATCH_SIZE \
+                    --checkpoint $CHECKPOINT \
+                    --dataset $DATASET | tee -a "$LOG_FILE"
 
-            # Wait for a moment to allow system resources to stabilize
-            sleep 5
+                # Check if training was successful
+                if [ $? -eq 0 ]; then
+                    echo "Successfully completed $CHECKPOINT at $(date)" | tee -a "$LOG_FILE"
+                else
+                    echo "Failed to train $CHECKPOINT at $(date)" | tee -a "$LOG_FILE"
+                fi
+
+                completed_combinations=$((completed_combinations + 1))
+
+                # Wait for a moment to allow system resources to stabilize
+                sleep 5
+            done
         done
     done
 done
@@ -121,17 +162,7 @@ done
 echo "----------------------------------------" | tee -a "$LOG_FILE"
 echo "All training runs completed at $(date)" | tee -a "$LOG_FILE"
 echo "Completed $completed_combinations/$total_combinations combinations" | tee -a "$LOG_FILE"
+echo "Skipped $skipped_combinations/$total_combinations existing combinations" | tee -a "$LOG_FILE"
 echo "----------------------------------------" | tee -a "$LOG_FILE"
 
 echo "Training complete. Log file saved at: $LOG_FILE"
-
-
-
-
-
-
-
-
-
-
-
