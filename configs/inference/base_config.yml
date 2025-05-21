@@ -1,6 +1,7 @@
 # Data configuration
 data:
-  dataset_path: "data/processed"
+  name: "naver"
+  dataset_path: "data/naver_processed"
   image_size: [256, 256]
   num_classes: &num_classes 5
   batch_size: 16
@@ -17,6 +18,12 @@ data:
     2: [200, 200, 200]
     3: [34, 97, 38]
     4: [0, 69, 255]
+  labels:
+    0: "Background"
+    1: "Building"
+    2: "Road"
+    3: "Tree"
+    4: "Water"
 
 # Augmentation configuration
 augmentation:
@@ -39,6 +46,9 @@ loss:
 
 # Inference configuration
 inference:
-  checkpoints: ["checkpoints/cross_entropy_resnet50_deeplabv3plus.pth"]
-  input_path: "data/raw/TrueOrtho_resample/Ortho_Row(241)_Col(322)_resample.tif"
-  output_path: "results/"
+  checkpoint: "checkpoints/naver_cross_entropy_resnet50_deeplabv3plus.pth"
+  input: "data/naver_processed/test.txt"
+  output: "results/"
+
+clearml:
+  project_name: "Aerial Semantic Segmentation"

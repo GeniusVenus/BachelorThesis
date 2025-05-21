@@ -19,7 +19,7 @@ def main():
 
     print("==============Configs==============")
     print(config)
-    
+
     # Print configuration
     print("==============Dataset Processing Configuration==============")
     print(f"Raw directory: {config['dataset_path']['raw']}")
@@ -29,11 +29,11 @@ def main():
     print(f"Zero threshold: {config['patch']['zero_threshold']}")
     print(f"Split ratio: {config['patch']['split']['ratio']}")
     print(f"Split seed: {config['patch']['split']['seed']}")
-    
+
     # Process the dataset
     print("\n==============Processing Dataset==============")
     process_dataset(config)
-    
+
     print("\n==============Dataset Processing Complete==============")
     print(f"Processed dataset saved to: {config['dataset_path']['processed']}")
     print(f"Dataset structure:")

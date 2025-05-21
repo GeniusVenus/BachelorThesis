@@ -9,7 +9,37 @@ from src.models import SegmentationModel
 from src.utils.checkpoint import load_checkpoint
 from src.inference.predictor import Predictor
 
-os.environ['CLEARML_CONFIG_FILE'] = '../clearml.conf'
+# Import ClearML
+from clearml import Task
+
+# os.environ['CLEARML_CONFIG_FILE'] = '../clearml.conf'
+
+def setup_clearml(args, config):
+    """Setup ClearML task for experiment tracking"""
+    # Create a task
+    if 'encoder_name' in config['model']['params']:
+        backbone = config['model']['params']['encoder_name']
+        task_name = f"{config['loss']['name']}_{config['model']['params']['encoder_name']}_{config['model']['name']}"
+    else:
+        backbone = config['model']['params']['pretrained_model']
+        task_name = f"{config['loss']['name']}_{config['model']['params']['pretrained_model']}_{config['model']['name']}"
+
+    project_name = config.get('clearml', {}).get('project_name', 'Segmentation')
+
+    task = Task.init(
+        project_name=project_name,
+        task_name=task_name,
+        task_type="inference",
+        tags=[config['loss']['name'], config['model']['name'], backbone, config['data']['name']],
+    )
+
+    # Connect configuration to the task
+    task.connect_configuration(config)
+
+    # Log the command line arguments
+    task.connect(vars(args))
+
+    return task
 
 def main():
     # Parse command line arguments
@@ -17,29 +47,46 @@ def main():
 
     print("==============Arguments==============")
     print(args)
-    
+
     # Load and merge configurations
     config = load_config_from_inference_args(args)
-    
+
     print("==============Configs==============")
     print(config)
-    
+
+    # Setup ClearML for inference
+    # task = setup_clearml(args, config)
+    task = None
+
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+
     # Initialize model
     model = SegmentationModel.get_model(config['model']['name'], **config['model'].get('params', {}))
-    
-    input_path = config['inference']['input_path']
-    output_path = config['inference']['output_path']
 
-    for checkpoint in config['inference']['checkpoints']:
-        load_checkpoint(model, checkpoint)
-    
-        # Initialize predictor
-        predictor = Predictor(model=model, config=config, device=device)
-        
-        predictor.predict_large_image(input_path, output_path)
+    input_path = config['inference']['input']
+    output_path = config['inference']['output']
+
+    checkpoint = config['inference']['checkpoint']
+    load_checkpoint(model, checkpoint)
+
+    if task:
+        # Log the checkpoint being used
+        task.logger.report_text(f"Using checkpoint: {checkpoint}")
+
+    # Initialize predictor
+    predictor = Predictor(model=model, config=config, device=device, task=task)
+
+    with open(input_path, 'r') as f:
+        files = f.readlines()
+        for file_name in files:
+            # Log the input image being processed
+            file = f"{config['data']['dataset_path']}/test/{file_name}"
+            if task:
+                task.logger.report_text(f"Processing input: {file}")
+
+            # Perform inference
+            predictor.predict_large_image(file, output_path)
 
 if __name__ == '__main__':
     main()
