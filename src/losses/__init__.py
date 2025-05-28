@@ -4,7 +4,8 @@ from src.losses.focal import FocalLoss
 from src.losses.jaccard import JaccardLoss
 from src.losses.tversky import TverskyLoss
 from src.losses.lovasz import LovaszLoss
-
+from src.losses.combo import ComboLoss
+from src.losses.unified_focal import UnifiedFocalLoss
 
 class SegmentationLoss:
     @staticmethod
@@ -16,6 +17,8 @@ class SegmentationLoss:
             'jaccard': JaccardLoss,
             'tversky': TverskyLoss,
             'lovasz': LovaszLoss,
+            'combo': ComboLoss ,
+            'unified_focal': UnifiedFocalLoss,
         }
         
         if(loss_name == 'all'):

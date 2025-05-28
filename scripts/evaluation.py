@@ -30,6 +30,11 @@ def main():
     print("\n==============Config==============")
     print(config)
     
+    # Setup ClearML
+    task = setup_clearml(args, config)
+
+    # task = None
+
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     

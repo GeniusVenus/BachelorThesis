@@ -1,0 +1,33 @@
+data:
+  name: "open_earth_map"
+  dataset_path: "data/open_earth_map_processed"
+  raw_paths:
+    root: "data/open_earth_map_raw"
+    image: "data/open_earth_map_raw"
+    label: "data/open_earth_map_raw"
+  image_size: [256, 256]
+  num_classes: 9
+  batch_size: 16
+  patch:
+    size: 256
+    extension: ".tif"
+  color_map:
+    0: [0, 0, 0] # Other
+    1: [128, 0, 0] # Bareland
+    2: [0, 255, 36] # Rangeland
+    3: [148, 148, 148] # Developed space
+    4: [230, 230, 230] # Road
+    5: [34, 97, 38] # Tree
+    6: [0, 69, 255] # Water
+    7: [75, 181, 73] # Agriculture land
+    8: [222, 31, 7] # Building
+  labels:
+    0: "Other"
+    1: "Bareland"
+    2: "Rangeland"
+    3: "Developed space"
+    4: "Road"
+    5: "Tree"
+    6: "Water"
+    7: "Agriculture land"
+    8: "Building"

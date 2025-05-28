@@ -195,3 +195,5 @@ fabric.properties
 !/results/.gitkeep
 
 .vscode
+
+Report/

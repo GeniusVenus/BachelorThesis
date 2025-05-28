@@ -33,13 +33,31 @@ def main():
     input_path = config['inference']['input_path']
     output_path = config['inference']['output_path']
 
-    for checkpoint in config['inference']['checkpoints']:
-        load_checkpoint(model, checkpoint)
-    
-        # Initialize predictor
-        predictor = Predictor(model=model, config=config, device=device)
-        
-        predictor.predict_large_image(input_path, output_path)
+    input_path = config['inference']['input']
+    output_path = config['inference']['output']
+
+    checkpoint = config['inference']['checkpoint']
+    load_checkpoint(model, checkpoint)
+
+    if task:
+        # Log the checkpoint being used
+        task.logger.report_text(f"Using checkpoint: {checkpoint}")
+
+    # Initialize predictor
+    predictor = Predictor(model=model, config=config, device=device, task=task)
+
+    with open(input_path, 'r') as f:
+        files = f.readlines()
+        for file_name in files:
+            # Log the input image being processed
+            file = f"{config['data']['raw_paths']['image']}/{file_name}"
+            if file_name.__contains__("patch"):
+                file = f"{config['data']['dataset_path']}/test/images/{file_name}"
+            if task:
+                task.logger.report_text(f"Processing input: {file}")
+
+            # Perform inference
+            predictor.predict_large_image(file, output_path)
 
 if __name__ == '__main__':
     main()
