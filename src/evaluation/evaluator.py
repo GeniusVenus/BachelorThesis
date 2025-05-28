@@ -2,20 +2,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import os
-import json
 from typing import Dict, Any, List, Optional, Tuple
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from src.utils.metric import AverageMeter
 import torchmetrics
+from clearml import Task
 
 class Evaluator:
     def __init__(
         self,
         model: nn.Module,
         config: Dict[str, Any],
-        device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
+        task: Optional[Task] = None  # Add ClearML task parameter
     ):
         """
         Initialize the Evaluator.
@@ -24,10 +24,12 @@ class Evaluator:
             model: The trained model to evaluate
             config: Configuration dictionary
             device: Device to run the model on
+            task: ClearML Task for logging (optional)
         """
         self.model = model
         self.config = config
         self.device = device
+        self.task = task  # Store ClearML task
         self.model.to(self.device)
         self.model.eval()
         
@@ -81,13 +83,15 @@ class Evaluator:
         metrics = {
             'loss': AverageMeter(),
             'iou': AverageMeter(),
-            'dice': AverageMeter()
+            'dice': AverageMeter(),
+            'accuracy': AverageMeter()
         }
         
-        # Add per-class IoU and Dice metrics
+        # Add per-class metrics
         for i in range(self.num_classes):
             metrics[f'iou_class_{i}'] = AverageMeter()
             metrics[f'dice_class_{i}'] = AverageMeter()
+            metrics[f'accuracy_class_{i}'] = AverageMeter()
             
         return metrics
     
@@ -147,9 +151,11 @@ class Evaluator:
         # Update overall metrics
         iou_value = self.torchmetrics['iou'](y_pred, y_true)
         dice_value = self.torchmetrics['dice'](y_pred, y_true)
+        accuracy_value = self.torchmetrics['accuracy'](y_pred, y_true)
         
         self.metrics['iou'].update(iou_value.item(), batch_size)
         self.metrics['dice'].update(dice_value.item(), batch_size)
+        self.metrics['accuracy'].update(accuracy_value.item(), batch_size)
         
         # Get per-class values (returns tensor of shape [num_classes])
         per_class_iou = self.torchmetrics['iou_per_class'](y_pred, y_true)
@@ -299,6 +305,7 @@ class Evaluator:
         results = self.evaluate_dataloader(split_dataloader, criterion)
         
         # Print results
+        print(f"{split_name.capitalize()} Accuracy: {results['accuracy']:.4f}")
         print(f"{split_name.capitalize()} Loss: {results['loss']:.4f}")
         print(f"{split_name.capitalize()} IoU: {results['iou']:.4f}")
         print(f"{split_name.capitalize()} Dice: {results['dice']:.4f}")
@@ -306,7 +313,13 @@ class Evaluator:
         # Print per-class metrics
         print(f"\nPer-class metrics for {split_name} split:")
         for i in range(self.num_classes):
-            print(f"Class {i}: IoU = {results[f'iou_class_{i}']:.4f}, Dice = {results[f'dice_class_{i}']:.4f}")
+            print(f"Class {i}: IoU = {results[f'iou_class_{i}']:.4f}, "
+                  f"Dice = {results[f'dice_class_{i}']:.4f}, "
+                  f"Accuracy = {results[f'accuracy_class_{i}']:.4f}")
+        
+        # Log metrics to ClearML
+        if self.task:
+            self._log_metrics_to_clearml(results, split_name)
         
         return results
     

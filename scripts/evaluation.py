@@ -3,10 +3,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
-import argparse
 from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
-import json
 
 from src.models import SegmentationModel
 from src.losses import SegmentationLoss
@@ -15,8 +12,36 @@ from src.utils.checkpoint import load_checkpoint
 from src.evaluation.evaluator import Evaluator
 from src.data.naver_dataset import NAVERDataset
 from src.utils.argument import parse_evaluation_args
+from clearml import Task
 
-os.environ['CLEARML_CONFIG_FILE'] = '../clearml.conf'
+# os.environ['CLEARML_CONFIG_FILE'] = '../clearml.conf'
+
+def setup_clearml(args, config):
+    """Setup ClearML task for experiment tracking"""
+    # Create a task
+    if 'encoder_name' in config['model']['params']:
+        backbone = config['model']['params']['encoder_name']
+        task_name = f"{config['loss']['name']}_{config['model']['params']['encoder_name']}_{config['model']['name']}"
+    else:
+        backbone = config['model']['params']['pretrained_model']
+        task_name = f"{config['loss']['name']}_{config['model']['params']['pretrained_model']}_{config['model']['name']}"
+
+    project_name = config.get('clearml', {}).get('project_name', 'Segmentation')
+
+    task = Task.init(
+        project_name=project_name,
+        task_name=task_name,
+        task_type="monitor",
+        tags=[config['loss']['name'], config['model']['name'], backbone, config['data']['name']],
+    )
+
+    # Connect configuration to the task
+    task.connect_configuration(config)
+
+    # Log the command line arguments
+    task.connect(vars(args))
+
+    return task
 
 def main():
     # Parse command line arguments
@@ -48,27 +73,26 @@ def main():
     # Setup datasets and dataloaders
     train_dataset = NAVERDataset(config, split='train')
     val_dataset = NAVERDataset(config, split='val')
-    test_dataset = NAVERDataset(config, split='test')
+    # test_dataset = NAVERDataset(config, split='test')
     
     train_loader = DataLoader(train_dataset, batch_size=config['data']['batch_size'], shuffle=False)
     val_loader = DataLoader(val_dataset, batch_size=config['data']['batch_size'], shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=config['data']['batch_size'], shuffle=False)
+    # test_loader = DataLoader(test_dataset, batch_size=config['data']['batch_size'], shuffle=False)
     
     # Load checkpoint
-    for checkpoint in config['evaluation']['checkpoints']:
-        load_checkpoint(model, checkpoint)
-        # Initialize evaluator
-        evaluator = Evaluator(model=model, config=config, device=device)
-        
-        # Evaluate on all splits
-        print("\n==============Evaluation==============")
-        results = evaluator.evaluate_all_splits(train_loader, val_loader, test_loader, criterion)
+    load_checkpoint(model, config['evaluation']['checkpoint'])
     
-        # Print summary of results
-        print("\n==============Summary==============")
-        print(f"Train IoU: {results['train']['iou']:.4f}, Dice: {results['train']['dice']:.4f}")
-        print(f"Val IoU: {results['val']['iou']:.4f}, Dice: {results['val']['dice']:.4f}")
-        print(f"Test IoU: {results['test']['iou']:.4f}, Dice: {results['test']['dice']:.4f}")
+    # Initialize evaluator with ClearML task
+    evaluator = Evaluator(model=model, config=config, device=device, task=task)
+    
+    # Evaluate on all splits
+    print("\n==============Evaluation==============")
+    results = evaluator.evaluate_all_splits(train_loader, val_loader, None, criterion)   
+
+    # Print summary of results
+    print("\n==============Summary==============")
+    print(f"Train Loss: {results['train']['loss']:.4f}, IoU: {results['train']['iou']:.4f}, Dice: {results['train']['dice']:.4f}, Accuracy: {results['train']['accuracy']:.4f}")
+    print(f"Val Loss: {results['val']['loss']:.4f}, IoU: {results['val']['iou']:.4f}, Dice: {results['val']['dice']:.4f}, Accuracy: {results['val']['accuracy']:.4f}")
 
 if __name__ == '__main__':
     main()

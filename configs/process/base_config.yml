@@ -1,0 +1,27 @@
+dataset_name: 'naver'
+
+dataset_path:
+  root: "data"
+  raw: "data/naver_raw"
+  gen: "data/naver_gen"
+  processed: "data/naver_processed"
+patch:
+  size: 256
+  extension: ".tif"
+  split:
+    seed: 1337
+    ratio: [0.8, 0.1, 0.1]
+  zero_threshold: 1
+num_class: 5
+label_names:
+  0: "Background"
+  1: "Building"
+  2: "Road"
+  3: "Tree"
+  4: "Water"
+color_map:
+  0: [0, 0, 0]
+  1: [222, 31, 7]
+  2: [200, 200, 200]
+  3: [34, 97, 38]
+  4: [0, 69, 255]

@@ -17,6 +17,12 @@ data:
     2: [200, 200, 200]
     3: [34, 97, 38]
     4: [0, 69, 255]
+  labels:
+    0: "Background"
+    1: "Building"
+    2: "Road"
+    3: "Tree"
+    4: "Water"
 
 # Augmentation configuration
 augmentation:
@@ -39,4 +45,7 @@ loss:
 
 # Inference configuration
 evaluation:
-  checkpoints: ["checkpoints/cross_entropy_resnet50_deeplabv3plus.pth"]
+  checkpoint: "checkpoints/naver_cross_entropy_resnet50_deeplabv3plus.pth"
+
+clearml:
+  project_name: "Aerial Semantic Segmentation"

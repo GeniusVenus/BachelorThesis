@@ -1,7 +1,6 @@
 model:
   name: "segformer"
+  type: "transformer"
   params:
-    pretrained_model: "resnet50"
-    encoder_weights: "imagenet"
-    in_channels: 3
+    pretrained_model: "nvidia/mit-b0"
     classes: 5

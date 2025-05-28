@@ -11,4 +11,4 @@ class SegFormer(nn.Module):
         )
 
     def forward(self, x):
-        return self.model(x).logits
+        return self.model(x)

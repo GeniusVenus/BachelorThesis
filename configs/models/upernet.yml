@@ -3,5 +3,4 @@ model:
   type: "transformer"
   params:
     pretrained_model: "openmmlab/upernet-convnext-tiny"
-    in_channels: 3
     classes: 5

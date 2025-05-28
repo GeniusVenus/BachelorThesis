@@ -4,23 +4,31 @@ augmentation:
 
 # Data configuration
 data:
-  dataset_path: "data/processed"
+  name: "naver"
+  dataset_path: "data/naver_processed"
+  raw_path: "data/naver_raw"
   image_size: [256, 256]
   num_classes: &num_classes 5
   batch_size: 16
   color_map:
-    0: [0,0,0]
+    0: [0, 0, 0]
     1: [222, 31, 7]
     2: [200, 200, 200]
     3: [34, 97, 38]
     4: [0, 69, 255]
+  labels:
+    0: "Background"
+    1: "Building"
+    2: "Road"
+    3: "Tree"
+    4: "Water"
 
 # Model configuration
 model:
   name: "unet"
   type: "machine_learning"
   params:
-    encoder_name: "resnet34"
+    encoder_name: "resnet50"
     encoder_weights: "imagenet"
     in_channels: 3
     classes: *num_classes
@@ -56,5 +64,8 @@ metrics:
 # Training configuration
 training:
   epochs: 5
-  model_checkpoint: "checkpoints/unet.pth"
+  model_checkpoint: "checkpoints/model.pth"
 
+# ClearML configuration
+clearml:
+  project_name: "Aerial Semantic Segmentation"
