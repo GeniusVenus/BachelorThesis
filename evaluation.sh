@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Define arrays for all options
-MODELS=("deeplabv3plus" "pspnet" "fpn" "unet" "segformer" "upernet")
+MODELS=("upernet")
 LOSS_FUNCTIONS=("cross_entropy" "dice" "focal" "jaccard" "lovasz" "tversky" "combo" "unified_focal")
-DATASETS=("naver")
+DATASETS=("open_earth_map")
 BATCH_SIZE=16
 
 # Define log directory and file explicitly
