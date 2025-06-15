@@ -42,32 +42,36 @@ class Evaluator:
         # Initialize metrics
         self.metrics = self._setup_metrics()
         
-        # Setup torchmetrics
-        metrics_config = {'task': 'multiclass', 'average': 'macro'}
+        # Setup torchmetrics 
         self.torchmetrics = {
-            'iou': torchmetrics.JaccardIndex(num_classes=self.num_classes, task=metrics_config['task'],
-                                            average=metrics_config['average']).to(self.device),
-            'dice': torchmetrics.Dice(num_classes=self.num_classes, average=metrics_config['average']).to(self.device),
-            'accuracy': torchmetrics.Accuracy(task=metrics_config['task'], num_classes=self.num_classes,
-                                            average=metrics_config['average']).to(self.device)
-        }
-        
-        # Add per-class metrics
-        for i in range(self.num_classes):
-            self.torchmetrics[f'iou_class_{i}'] = torchmetrics.JaccardIndex(
+            # Overall metrics (macro average)
+            'iou': torchmetrics.JaccardIndex(
                 num_classes=self.num_classes, 
-                task=metrics_config['task'],
-                average=metrics_config['average']
-            ).to(self.device)
-            self.torchmetrics[f'dice_class_{i}'] = torchmetrics.Dice(
+                task='multiclass',
+                average='macro'
+            ).to(self.device),
+            'dice': torchmetrics.Dice(
+                num_classes=self.num_classes, 
+                average='macro'
+            ).to(self.device),
+            'accuracy': torchmetrics.Accuracy(
+                task='multiclass', 
                 num_classes=self.num_classes,
-                average=metrics_config['average']
-            ).to(self.device)
-            self.torchmetrics[f'accuracy_class_{i}'] = torchmetrics.Accuracy(
-                task=metrics_config['task'],
+                average='macro'
+            ).to(self.device),
+            
+            # Per-class metrics (no averaging - returns tensor of per-class values)
+            'iou_per_class': torchmetrics.JaccardIndex(
+                num_classes=self.num_classes, 
+                task='multiclass',
+                average=None
+            ).to(self.device),
+            'accuracy_per_class': torchmetrics.Accuracy(
+                task='multiclass',
                 num_classes=self.num_classes,
-                average=metrics_config['average']
+                average=None
             ).to(self.device)
+        }
     
     def _setup_metrics(self) -> Dict[str, AverageMeter]:
         """
@@ -99,6 +103,37 @@ class Evaluator:
         # Reset torchmetrics
         for metric in self.torchmetrics.values():
             metric.reset()
+            
+    def _calculate_per_class_dice(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        """
+        Calculate per-class Dice coefficient manually.
+        
+        Args:
+            y_pred: Predicted segmentation masks [B, H, W]
+            y_true: Ground truth segmentation masks [B, H, W]
+            
+        Returns:
+            Tensor of per-class Dice coefficients [num_classes]
+        """
+        dice_scores = torch.zeros(self.num_classes, device=self.device)
+        
+        for class_idx in range(self.num_classes):
+            # Create binary masks for current class
+            pred_class = (y_pred == class_idx).float()
+            true_class = (y_true == class_idx).float()
+            
+            # Calculate intersection and union
+            intersection = (pred_class * true_class).sum()
+            total = pred_class.sum() + true_class.sum()
+            
+            # Calculate Dice coefficient
+            if total > 0:
+                dice_scores[class_idx] = (2.0 * intersection) / total
+            else:
+                # If class doesn't exist in batch, set to NaN
+                dice_scores[class_idx] = float('nan')
+                
+        return dice_scores
     
     def _update_metrics(self, y_pred: torch.Tensor, y_true: torch.Tensor, loss: float, batch_size: int):
         """
@@ -113,7 +148,7 @@ class Evaluator:
         # Update loss
         self.metrics['loss'].update(loss, batch_size)
         
-        # Update torchmetrics
+        # Update overall metrics
         iou_value = self.torchmetrics['iou'](y_pred, y_true)
         dice_value = self.torchmetrics['dice'](y_pred, y_true)
         accuracy_value = self.torchmetrics['accuracy'](y_pred, y_true)
@@ -122,19 +157,22 @@ class Evaluator:
         self.metrics['dice'].update(dice_value.item(), batch_size)
         self.metrics['accuracy'].update(accuracy_value.item(), batch_size)
         
-        # Update per-class metrics
+        # Get per-class values (returns tensor of shape [num_classes])
+        per_class_iou = self.torchmetrics['iou_per_class'](y_pred, y_true)
+        per_class_accuracy = self.torchmetrics['accuracy_per_class'](y_pred, y_true)
+        
+        # Calculate per-class dice manually
+        per_class_dice = self._calculate_per_class_dice(y_pred, y_true)
+        
+        # Update individual class metrics
         for i in range(self.num_classes):
-            class_pred = (y_pred == i).long()
-            class_true = (y_true == i).long()
-            
-            if class_true.sum() > 0 or class_pred.sum() > 0:
-                class_iou = self.torchmetrics['iou'](class_pred, class_true)
-                class_dice = self.torchmetrics['dice'](class_pred, class_true)
-                class_accuracy = self.torchmetrics['accuracy'](class_pred, class_true)
-                
-                self.metrics[f'iou_class_{i}'].update(class_iou.item(), batch_size)
-                self.metrics[f'dice_class_{i}'].update(class_dice.item(), batch_size)
-                self.metrics[f'accuracy_class_{i}'].update(class_accuracy.item(), batch_size)
+            # Handle potential NaN values (when class doesn't appear in batch)
+            if not torch.isnan(per_class_iou[i]):
+                self.metrics[f'iou_class_{i}'].update(per_class_iou[i].item(), batch_size)
+            if not torch.isnan(per_class_dice[i]):
+                self.metrics[f'dice_class_{i}'].update(per_class_dice[i].item(), batch_size)
+            if not torch.isnan(per_class_accuracy[i]):
+                self.metrics[f'accuracy_class_{i}'].update(per_class_accuracy[i].item(), batch_size)
     
     def evaluate_dataloader(self, dataloader: DataLoader, criterion: nn.Module) -> Dict[str, float]:
         """
@@ -156,28 +194,42 @@ class Evaluator:
         # Evaluate on dataloader
         with torch.no_grad():
             for batch in tqdm(dataloader, desc="Evaluating"):
-                # Get batch data
-                images = batch['image'].to(self.device)
-                masks = batch['mask'].to(self.device).long()  # Convert masks to Long type
-                
-                # Forward pass
+                n = batch['image'].shape[0]
+                images = batch['image'].to(self.device).float()
+                masks = batch['mask'].to(self.device).long()
+
                 outputs = self.model(images)
-                
-                # Handle different model output formats
-                if self.model_type == 'transformer':
+                if self.model_type == 'transformer' and hasattr(outputs, 'logits'):
                     outputs = outputs.logits
-                
-                # Calculate loss
+
+                if self.model_type == 'transformer':
+                    outputs = F.interpolate(outputs, size=masks.shape[1:], mode='bilinear', align_corners=False)
+
                 loss = criterion(outputs, masks)
-                
-                # Get predictions
-                preds = torch.argmax(outputs, dim=1)
+
+                # Apply softmax before argmax to match training
+                preds = torch.argmax(torch.softmax(outputs, dim=1), dim=1)
                 
                 # Update metrics
-                self._update_metrics(preds, masks, loss.item(), images.size(0))
+                self._update_metrics(preds, masks, loss.item(), n)
         
         # Get final metric values
         results = {name: meter.avg for name, meter in self.metrics.items()}
+        
+       # Debug: Get the final torchmetrics values to compare
+        final_torchmetrics_iou = self.torchmetrics['iou'].compute()
+        final_per_class_iou = self.torchmetrics['iou_per_class'].compute()
+        
+        # Verify that mIoU equals mean of per-class IoUs
+        manual_miou = sum(results[f'iou_class_{i}'] for i in range(self.num_classes)) / self.num_classes
+        torchmetrics_manual_miou = torch.nanmean(final_per_class_iou).item()
+        
+        print(f"Manual mIoU calculation (from AverageMeters): {manual_miou:.4f}")
+        print(f"TorchMetrics mIoU (macro): {results['iou']:.4f}")
+        print(f"TorchMetrics mIoU (direct): {final_torchmetrics_iou:.4f}")
+        print(f"TorchMetrics per-class mean: {torchmetrics_manual_miou:.4f}")
+        print(f"Per-class IoU values (torchmetrics): {final_per_class_iou}")
+        print(f"Per-class IoU values (our calculation): {[results[f'iou_class_{i}'] for i in range(self.num_classes)]}")
         
         return results
     
@@ -210,7 +262,6 @@ class Evaluator:
         for i in range(self.num_classes):
             class_name = label_map.get(i, f"Class {i}")
             
-            # Report as individual scalars
             self.task.logger.report_histogram(
                 title=f"{split_name}/Per-Class IoU",
                 series=class_name,

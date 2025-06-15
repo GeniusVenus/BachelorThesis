@@ -1,0 +1,1 @@
+2025-05-17 22:51:06,971 - INFO - Hyperparameters: model_type: machine_learning, optimizer: adam, learning_rate: 0.0001, scheduler: reduce_on_plateau, batch_size: 16, epochs: 50

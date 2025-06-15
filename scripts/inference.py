@@ -55,8 +55,8 @@ def main():
     print(config)
 
     # Setup ClearML for inference
-    # task = setup_clearml(args, config)
-    task = None
+    task = setup_clearml(args, config)
+    # task = None
 
     # Set device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -81,12 +81,24 @@ def main():
         files = f.readlines()
         for file_name in files:
             # Log the input image being processed
-            file = f"{config['data']['dataset_path']}/test/{file_name}"
+            file_name = file_name.strip()
+            file = f"{config['data']['raw_paths']['image']}/{file_name}"
+            if config['data']['name'] == 'naver':
+                mask_file_name = file_name.replace('Ortho', 'Mask')
+                mask_file = f"{config['data']['raw_paths']['label']}/{mask_file_name}"
+            else:
+                mask_file_name = file_name.replace('images', 'labels')
+                mask_file = f"{config['data']['raw_paths']['label']}/{mask_file_name}"
+
+            if file_name.__contains__("patch"):
+                file = f"{config['data']['dataset_path']}/val/images/{file_name}"
+                mask_file = f"{config['data']['dataset_path']}/val/labels/{file_name}"
+
             if task:
                 task.logger.report_text(f"Processing input: {file}")
 
             # Perform inference
-            predictor.predict_large_image(file, output_path)
+            predictor.predict_large_image(image_path=file, mask_path=mask_file, save_dir=output_path)
 
 if __name__ == '__main__':
     main()

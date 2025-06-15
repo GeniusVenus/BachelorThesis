@@ -1,15 +1,14 @@
 #!/bin/bash
 
 # Define arrays for all options
-MODELS=("upernet")
+MODELS=("deeplabv3plus" "pspnet" "fpn" "unet" "segformer" "upernet")
 LOSS_FUNCTIONS=("cross_entropy" "dice" "focal" "jaccard" "lovasz" "tversky" "combo" "unified_focal")
 DATASETS=("open_earth_map")
-EPOCHS=50
 BATCH_SIZE=16
 
 # Define log directory and file explicitly
-LOG_DIR="./logs"  # Current directory/logs
-LOG_FILE="$LOG_DIR/training_runs.log"
+LOG_DIR="./logs"
+LOG_FILE="$LOG_DIR/inference_runs.log"
 
 # Create log directory and file with error checking
 echo "Creating log directory at: $LOG_DIR"
@@ -18,20 +17,6 @@ if ! mkdir -p "$LOG_DIR"; then
     echo "Please check permissions or create it manually"
     exit 1
 fi
-
-echo "Creating log file at: $LOG_FILE"
-if ! touch "$LOG_FILE"; then
-    echo "ERROR: Failed to create log file at $LOG_FILE"
-    echo "Please check permissions or create it manually"
-    exit 1
-fi
-
-echo "Log file created successfully at: $LOG_FILE"
-
-# Log start time
-echo "----------------------------------------" | tee -a "$LOG_FILE"
-echo "Training started at $(date)" | tee -a "$LOG_FILE"
-echo "----------------------------------------" | tee -a "$LOG_FILE"
 
 # Function to determine backbone based on model
 get_backbone_info() {
@@ -43,7 +28,7 @@ get_backbone_info() {
         BACKBONE_PARAM="nvidia/mit-b3"
         BACKBONE_NAME="mit_b3"
     elif [[ "$model" == "upernet" ]]; then
-        # For UperNet, use openmmlab/upernet-convnext-base, but checkpoint name shows convnext_base
+        # For UperNet, use openmmlab/upernet-convnext-tiny (matching training script)
         BACKBONE_PARAM="openmmlab/upernet-convnext-tiny"
         BACKBONE_NAME="convnext_tiny"
     elif [[ "$model" == "unet" ]]; then
@@ -62,15 +47,12 @@ get_backbone_info() {
     fi
 }
 
-# Create checkpoints directory if it doesn't exist
-mkdir -p checkpoints
-
 # Track total and completed runs
 total_combinations=0
 completed_combinations=0
 skipped_combinations=0
 
-# Count combinations
+# Count combinations (matching training script logic)
 for DATASET in "${DATASETS[@]}"; do
     for MODEL in "${MODELS[@]}"; do
         if [[ "$MODEL" == "unet" ]]; then
@@ -89,7 +71,7 @@ for DATASET in "${DATASETS[@]}"; do
     done
 done
 
-echo "Planning to run $total_combinations combinations" | tee -a "$LOG_FILE"
+echo "Planning to run inference on $total_combinations combinations" | tee -a "$LOG_FILE"
 
 # Nested loops with dataset as outermost loop
 for DATASET in "${DATASETS[@]}"; do
@@ -117,36 +99,33 @@ for DATASET in "${DATASETS[@]}"; do
                 CHECKPOINT="${DATASET}_${LOSS}_${BACKBONE_NAME}_${MODEL}"
                 CHECKPOINT_FILE="checkpoints/${CHECKPOINT}.pth"
 
-                # Check if checkpoint already exists
-                if [ -f "$CHECKPOINT_FILE" ]; then
-                    echo "----------------------------------------" | tee -a "$LOG_FILE"
-                    echo "Skipping $CHECKPOINT ($(($completed_combinations + $skipped_combinations + 1))/$total_combinations)" | tee -a "$LOG_FILE"
-                    echo "Checkpoint already exists at: $CHECKPOINT_FILE" | tee -a "$LOG_FILE"
+                # Log the current combination
+                echo "----------------------------------------" | tee -a "$LOG_FILE"
+                echo "Running inference for $CHECKPOINT ($(($completed_combinations + $skipped_combinations + 1))/$total_combinations)" | tee -a "$LOG_FILE"
+                echo "Using dataset=$DATASET, model=$MODEL, backbone=$BACKBONE_PARAM, loss=$LOSS" | tee -a "$LOG_FILE"
+                echo "Started at $(date)" | tee -a "$LOG_FILE"
+
+                # Check if checkpoint exists - SKIP if it doesn't exist
+                if [ ! -f "$CHECKPOINT_FILE" ]; then
+                    echo "Checkpoint not found: $CHECKPOINT_FILE" | tee -a "$LOG_FILE"
+                    echo "Skipping inference..." | tee -a "$LOG_FILE"
                     skipped_combinations=$((skipped_combinations + 1))
                     continue
                 fi
 
-                # Log the current combination
-                echo "----------------------------------------" | tee -a "$LOG_FILE"
-                echo "Training $CHECKPOINT ($(($completed_combinations + $skipped_combinations + 1))/$total_combinations)" | tee -a "$LOG_FILE"
-                echo "Using dataset=$DATASET, model=$MODEL, backbone=$BACKBONE_PARAM, loss=$LOSS" | tee -a "$LOG_FILE"
-                echo "Started at $(date)" | tee -a "$LOG_FILE"
-
-                # Run the training command with the actual backbone parameter
-                python scripts/train.py \
-                    --model $MODEL \
-                    --backbone "$BACKBONE_PARAM" \
+                # Run the inference command
+                python scripts/inference.py \
                     --loss $LOSS \
-                    --epochs $EPOCHS \
-                    --batch-size $BATCH_SIZE \
+                    --backbone "$BACKBONE_PARAM" \
+                    --model $MODEL \
                     --checkpoint $CHECKPOINT \
                     --dataset $DATASET | tee -a "$LOG_FILE"
 
-                # Check if training was successful
+                # Check if inference was successful
                 if [ $? -eq 0 ]; then
-                    echo "Successfully completed $CHECKPOINT at $(date)" | tee -a "$LOG_FILE"
+                    echo "Successfully completed inference for $CHECKPOINT at $(date)" | tee -a "$LOG_FILE"
                 else
-                    echo "Failed to train $CHECKPOINT at $(date)" | tee -a "$LOG_FILE"
+                    echo "Failed to run inference for $CHECKPOINT at $(date)" | tee -a "$LOG_FILE"
                 fi
 
                 completed_combinations=$((completed_combinations + 1))
@@ -158,11 +137,8 @@ for DATASET in "${DATASETS[@]}"; do
     done
 done
 
-# Log completion
 echo "----------------------------------------" | tee -a "$LOG_FILE"
-echo "All training runs completed at $(date)" | tee -a "$LOG_FILE"
-echo "Completed $completed_combinations/$total_combinations combinations" | tee -a "$LOG_FILE"
-echo "Skipped $skipped_combinations/$total_combinations existing combinations" | tee -a "$LOG_FILE"
+echo "Inference completed at $(date)" | tee -a "$LOG_FILE"
+echo "Total combinations processed: $completed_combinations/$total_combinations" | tee -a "$LOG_FILE"
+echo "Skipped combinations (no checkpoint): $skipped_combinations/$total_combinations" | tee -a "$LOG_FILE"
 echo "----------------------------------------" | tee -a "$LOG_FILE"
-
-echo "Training complete. Log file saved at: $LOG_FILE"

@@ -89,9 +89,10 @@ def load_config_from_inference_args(args):
         data_config = load_config(f"{os.path.join(DATA_CONFIG_FOLDER, args.dataset)}.yml")
         config = merge_configs(config, data_config)
         config['model']['params']['classes'] = data_config['data']['num_classes']
+        config['inference']['input'] = f"{data_config['data']['dataset_path']}/test.txt"
 
     if args.checkpoint:
-        config['evaluation']['checkpoint'] = f"checkpoints/{args.checkpoint}.pth"
+        config['inference']['checkpoint'] = f"checkpoints/{args.checkpoint}.pth"
     else:
         if 'pretrained_model' in config['model']['params']:
             backbone = config['model']['params']['pretrained_model']
@@ -130,9 +131,9 @@ def load_config_from_evaluation_args(args):
         data_config = load_config(f"{os.path.join(DATA_CONFIG_FOLDER, args.dataset)}.yml")
         config = merge_configs(config, data_config)
         config['model']['params']['classes'] = data_config['data']['num_classes']
-        
+
     if args.checkpoint:
-        config['evaluation']['checkpoint'] = args.checkpoint
+        config['evaluation']['checkpoint'] = f"checkpoints/{args.checkpoint}.pth"
     else:
         if 'pretrained_model' in config['model']['params']:
             backbone = config['model']['params']['pretrained_model']

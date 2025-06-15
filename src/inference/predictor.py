@@ -7,7 +7,6 @@ import cv2
 import os
 from typing import Dict, Any, Tuple, List, Optional
 from patchify import patchify, unpatchify
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 from PIL import Image
 
@@ -28,6 +27,8 @@ class Predictor:
             device: Device to run the model on
             task: ClearML Task for tracking
         """
+        self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
         self.model = model
         self.config = config
         self.device = device
@@ -100,7 +101,7 @@ class Predictor:
 
             return pred_mask
 
-    def predict_large_image(self, image_path: str, save_dir: Optional[str] = None) -> np.ndarray:
+    def predict_large_image(self, image_path: str, mask_path: str = None ,save_dir: Optional[str] = None) -> np.ndarray:
         """
         Predict segmentation for a large image by splitting it into patches.
 
@@ -112,20 +113,31 @@ class Predictor:
             Predicted segmentation mask for the entire image
         """
         # Read the large image
-        original_image = cv2.imread(image_path)
+        original_image = cv2.imread(f"{self.project_root}/{image_path}")
+
         if original_image is None:
-            raise ValueError(f"Could not read image {image_path}")
+            print(f"Could not read image {image_path}")
+            return
 
         # Convert BGR to RGB for processing
         original_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
 
         # Get the base filename without extension
         base_name = os.path.splitext(os.path.basename(image_path))[0]
-        
+
         # Log the input image to ClearML if available
         if self.task:
-            self.task.logger.report_image("Input", base_name,
+            self.task.logger.report_image("Image", base_name,
                                          image=original_image, iteration=0)
+
+            if mask_path:
+                mask = cv2.imread(f"{self.project_root}/{mask_path}", cv2.IMREAD_GRAYSCALE)
+
+                if mask is not None:
+                    colored_mask = self.create_colored_mask(mask)
+                    base_mask_name = os.path.splitext(os.path.basename(mask_path))[0]
+
+                    self.task.logger.report_image("Mask", base_mask_name, image=colored_mask, iteration=0)
 
         # Calculate size divisible by patch_size
         SIZE_X = (original_image.shape[1] // self.patch_size) * self.patch_size

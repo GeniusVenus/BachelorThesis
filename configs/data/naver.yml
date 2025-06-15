@@ -1,6 +1,10 @@
 data:
   name: "naver"
   dataset_path: "data/naver_processed"
+  raw_paths:
+    root: "data/naver_raw"
+    image: "data/naver_raw/TrueOrtho_resample"
+    label: "data/naver_raw/Mask2_resample"
   image_size: [256, 256]
   num_classes: 5
   batch_size: 16

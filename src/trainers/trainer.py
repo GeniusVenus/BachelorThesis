@@ -126,6 +126,10 @@ class Trainer:
                                               average=metrics_config['average']).to(self.device)
         }
         return metrics
+    
+    def _reset_metrics(self):
+        for meter in self.metric_meters.values():
+            meter.reset()
 
     def _update_metrics(self, phase: str, y_pred_mask, y, loss, n):
         dice_score = self.metrics['dice'](y_pred_mask, y)
@@ -176,16 +180,15 @@ class Trainer:
 
             self.optimizer.zero_grad()
 
-            with torch.amp.autocast("cuda"):
-                y_pred = self.model(x)
-                if self.model_type == 'transformer' and hasattr(y_pred, 'logits'):
-                    output = y_pred.logits
-                else:
-                    output = y_pred
+            y_pred = self.model(x)
+            if self.model_type == 'transformer' and hasattr(y_pred, 'logits'):
+                output = y_pred.logits
+            else:
+                output = y_pred
 
-                if self.model_type == 'transformer':
-                    output = F.interpolate(output, size=y.shape[1:], mode='bilinear', align_corners=False)
-                loss = self.loss_fn(output, y)
+            if self.model_type == 'transformer':
+                output = F.interpolate(output, size=y.shape[1:], mode='bilinear', align_corners=False)
+            loss = self.loss_fn(output, y)
 
             loss.backward()
             self.optimizer.step()
@@ -204,15 +207,14 @@ class Trainer:
                 x = batch['image'].to(self.device).float()
                 y = batch['mask'].to(self.device).long()
 
-                with torch.amp.autocast("cuda"):
-                    y_pred = self.model(x)
-                    if self.model_type == 'transformer' and hasattr(y_pred, 'logits'):
-                        output = y_pred.logits
-                    else:
-                        output = y_pred
-                    if self.model_type == 'transformer':
-                        output = F.interpolate(output, size=y.shape[1:], mode='bilinear', align_corners=False)
-                    loss = self.loss_fn(output, y)
+                y_pred = self.model(x)
+                if self.model_type == 'transformer' and hasattr(y_pred, 'logits'):
+                    output = y_pred.logits
+                else:
+                    output = y_pred
+                if self.model_type == 'transformer':
+                    output = F.interpolate(output, size=y.shape[1:], mode='bilinear', align_corners=False)
+                loss = self.loss_fn(output, y)
 
                 y_pred_mask = torch.argmax(torch.softmax(output, dim=1), dim=1)
                 assert y_pred_mask.shape == y.shape, f"Shape mismatch: {y_pred_mask.shape} vs {y.shape}"
@@ -222,6 +224,7 @@ class Trainer:
         training_config = self.config.get('training', {})
         num_epochs = training_config.get('epochs', 50)
         for epoch in range(1, num_epochs + 1):
+            self._reset_metrics()
             self.train_epoch()
             self.validate_epoch()
 
