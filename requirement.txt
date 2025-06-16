@@ -1,0 +1,13 @@
+albumentations==1.4.7
+clearml==1.18.0
+numpy==1.26.4
+opencv-python==4.9.0.80
+patchify==0.2.3
+Pillow==11.1.0
+PyYAML==6.0.2
+segmentation-models-pytorch==0.3.3
+tensorboard==2.16.2
+torch==2.4.0
+torchmetrics==1.4.0.post0
+tqdm==4.67.1
+transformers==4.41.0
